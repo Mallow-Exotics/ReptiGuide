@@ -165,6 +165,28 @@
   /* ---------- Species page (blank for now) ---------- */
   .species-page { min-height: calc(100vh - 64px); }
 
+  .guide-section {
+    padding: clamp(32px, 6vh, 56px) 0;
+    border-top: 1px solid var(--line);
+  }
+  .guide-section:first-child { border-top: none; }
+
+  .guide-section h2 {
+    font-family: var(--display);
+    font-weight: 700;
+    font-size: clamp(1.6rem, 4.5vw, 2.2rem);
+    letter-spacing: -0.01em;
+    margin-bottom: 16px;
+    color: var(--accent);
+  }
+
+  .guide-section p {
+    max-width: 62ch;
+    font-size: 1.05rem;
+    color: var(--text);
+  }
+  .guide-section p + p { margin-top: 1em; }
+
   /* ---------- View switching ---------- */
   #home, #species { display: none; }
   body.on-home #home { display: block; }
@@ -186,7 +208,7 @@
   <main id="home" class="container">
     <section class="hero">
       <h1>ReptiGuide</h1>
-      <p>Welcome to ReptiGuide, proven advice and information for the modern standard of reptile care.</p>
+      <p>Welcome to ReptiGuide, for the modern standard of reptile care.</p>
     </section>
 
     <ul class="species-list" id="species-list"></ul>
@@ -206,7 +228,65 @@
     { slug: "western-hognose-snake", name: "Western Hognose Snake", image: "images/western-hognose-snake.jpg" }
   ];
 
+  /* =====================================================================
+     EDIT YOUR GUIDE TEXT HERE
+     ---------------------------------------------------------------------
+     Every reptile has the same 7 sections. Replace the word  Here  with
+     your own text. Rules:
+       - Keep the text between the backticks ( ` ` ).
+       - Leave a blank line between paragraphs.
+       - Don't use a backtick inside your text.
+     ===================================================================== */
+
+  // The sections shown on every reptile page, in this order.
+  const SECTIONS = [
+    "Enclosure Size",
+    "Habitat Decoration",
+    "Lighting",
+    "Heating & Humidity",
+    "Cohabitation & Behavior",
+    "Habitat Control & Monitoring",
+    "Treatment"
+  ];
+
+  const CONTENT = {
+
+    "leopard-gecko": {
+      "Enclosure Size": `Here`,
+      "Habitat Decoration": `Here`,
+      "Lighting": `Here`,
+      "Heating & Humidity": `Here`,
+      "Cohabitation & Behavior": `Here`,
+      "Habitat Control & Monitoring": `Here`,
+      "Treatment": `Here`
+    },
+
+    "crested-gecko": {
+      "Enclosure Size": `Here`,
+      "Habitat Decoration": `Here`,
+      "Lighting": `Here`,
+      "Heating & Humidity": `Here`,
+      "Cohabitation & Behavior": `Here`,
+      "Habitat Control & Monitoring": `Here`,
+      "Treatment": `Here`
+    },
+
+    "western-hognose-snake": {
+      "Enclosure Size": `Here`,
+      "Habitat Decoration": `Here`,
+      "Lighting": `Here`,
+      "Heating & Humidity": `Here`,
+      "Cohabitation & Behavior": `Here`,
+      "Habitat Control & Monitoring": `Here`,
+      "Treatment": `Here`
+    }
+
+  };
+
+  /* ===================== END OF EDITABLE TEXT ===================== */
+
   const SITE_NAME = "ReptiGuide";
+  const speciesEl = document.getElementById("species");
   const list = document.getElementById("species-list");
   const titleEl = document.getElementById("topbar-title");
 
@@ -229,6 +309,32 @@
     list.appendChild(li);
   });
 
+  // Build the scrolling sections for one reptile
+  function renderSpecies(slug) {
+    const container = document.createElement("div");
+    container.className = "container";
+    const text = CONTENT[slug] || {};
+
+    SECTIONS.forEach(title => {
+      const section = document.createElement("section");
+      section.className = "guide-section";
+
+      const h2 = document.createElement("h2");
+      h2.textContent = title;
+      section.appendChild(h2);
+
+      (text[title] || "Coming soon").trim().split(/\n\s*\n/).forEach(para => {
+        const p = document.createElement("p");
+        p.textContent = para.trim();
+        section.appendChild(p);
+      });
+
+      container.appendChild(section);
+    });
+
+    speciesEl.replaceChildren(container);
+  }
+
   // Simple hash router (works on GitHub Pages with just index.html)
   function route() {
     const slug = location.hash.replace(/^#\/?/, "");
@@ -236,6 +342,7 @@
 
     if (species) {
       document.body.className = "on-species";
+      renderSpecies(species.slug);
       titleEl.textContent = species.name;
       document.title = species.name + " | " + SITE_NAME;
     } else {
