@@ -1,0 +1,253 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ReptiGuide</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,700&family=Instrument+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0d1511;
+    --surface: #15201a;
+    --line: #26372d;
+    --text: #e8efe9;
+    --muted: #93a79a;
+    --accent: #b8e04a;
+    --display: "Fraunces", Georgia, serif;
+    --body: "Instrument Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  html, body { min-height: 100%; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--body);
+    line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* ---------- Top bar ---------- */
+  .topbar {
+    position: sticky;
+    top: 0;
+    z-index: 10;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    height: 64px;
+    padding: 0 clamp(20px, 5vw, 48px);
+    background: rgba(13, 21, 17, 0.85);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    border-bottom: 1px solid var(--line);
+  }
+
+  .topbar-title {
+    font-family: var(--display);
+    font-weight: 700;
+    font-size: 1.35rem;
+    letter-spacing: 0.01em;
+    color: var(--text);
+    text-decoration: none;
+  }
+
+  .back {
+    display: none;
+    align-items: center;
+    color: var(--muted);
+    text-decoration: none;
+    font-size: 0.9rem;
+    padding: 6px 12px;
+    border: 1px solid var(--line);
+    border-radius: 999px;
+    transition: color .2s, border-color .2s;
+  }
+  .back:hover { color: var(--accent); border-color: var(--accent); }
+  body.on-species .back { display: inline-flex; }
+
+  /* ---------- Home ---------- */
+  .container {
+    max-width: 760px;
+    margin: 0 auto;
+    padding: clamp(48px, 10vh, 96px) clamp(20px, 5vw, 32px) 80px;
+  }
+
+  .hero { margin-bottom: clamp(40px, 7vh, 64px); }
+
+  .hero h1 {
+    font-family: var(--display);
+    font-weight: 700;
+    font-size: clamp(3rem, 9vw, 5.5rem);
+    line-height: 1;
+    letter-spacing: -0.02em;
+    margin-bottom: 20px;
+    animation: rise .8s ease both;
+  }
+
+  .hero p {
+    max-width: 34ch;
+    font-size: clamp(1.05rem, 2.4vw, 1.25rem);
+    color: var(--muted);
+    animation: rise .8s .12s ease both;
+  }
+
+  @keyframes rise {
+    from { opacity: 0; transform: translateY(14px); }
+    to   { opacity: 1; transform: none; }
+  }
+
+  /* ---------- Species buttons ---------- */
+  .species-list {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    list-style: none;
+  }
+
+  .species-btn {
+    position: relative;
+    display: flex;
+    align-items: center;
+    width: 100%;
+    min-height: 120px;
+    padding: 0 28px;
+    border: 1px solid var(--line);
+    border-radius: 14px;
+    overflow: hidden;
+    background: var(--surface);
+    color: var(--text);
+    text-decoration: none;
+    font-family: var(--display);
+    font-weight: 500;
+    font-size: clamp(1.4rem, 4vw, 1.9rem);
+    isolation: isolate;
+    transition: border-color .25s, transform .25s;
+  }
+
+  /* The reptile photo, fading from right (visible) to left (hidden) */
+  .species-btn .photo {
+    position: absolute;
+    inset: 0;
+    z-index: -2;
+    background-size: cover;
+    background-position: center;
+    -webkit-mask-image: linear-gradient(to right, transparent 15%, rgba(0,0,0,.95) 100%);
+            mask-image: linear-gradient(to right, transparent 15%, rgba(0,0,0,.95) 100%);
+    opacity: .75;
+    transform: scale(1.04);
+    transition: transform .6s ease, opacity .3s;
+  }
+
+  .species-btn::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    background: linear-gradient(to right, var(--surface) 25%, transparent 85%);
+  }
+
+  .species-btn:hover,
+  .species-btn:focus-visible {
+    border-color: var(--accent);
+    transform: translateX(4px);
+    outline: none;
+  }
+  .species-btn:hover .photo,
+  .species-btn:focus-visible .photo { transform: scale(1.1); opacity: 1; }
+
+  .species-btn:focus-visible { box-shadow: 0 0 0 3px rgba(184, 224, 74, .35); }
+
+  /* ---------- Species page (blank for now) ---------- */
+  .species-page { min-height: calc(100vh - 64px); }
+
+  /* ---------- View switching ---------- */
+  #home, #species { display: none; }
+  body.on-home #home { display: block; }
+  body.on-species #species { display: block; }
+
+  @media (prefers-reduced-motion: reduce) {
+    * { animation: none !important; transition: none !important; }
+  }
+</style>
+</head>
+<body class="on-home">
+
+  <header class="topbar">
+    <a class="back" href="#/" aria-label="Back to home">&larr; Back</a>
+    <a class="topbar-title" id="topbar-title" href="#/">ReptiGuide</a>
+  </header>
+
+  <!-- HOME -->
+  <main id="home" class="container">
+    <section class="hero">
+      <h1>ReptiGuide</h1>
+      <p>Welcome to ReptiGuide, for the modern standard of reptile care.</p>
+    </section>
+
+    <ul class="species-list" id="species-list"></ul>
+  </main>
+
+  <!-- SPECIES PAGE (blank) -->
+  <main id="species" class="species-page"></main>
+
+<script>
+  /*
+    To add a new reptile, add one entry here.
+    Put the photo in the /images folder next to index.html.
+  */
+  const SPECIES = [
+    { slug: "leopard-gecko",        name: "Leopard Gecko",        image: "images/leopard-gecko.jpg" },
+    { slug: "crested-gecko",        name: "Crested Gecko",        image: "images/crested-gecko.jpg" },
+    { slug: "western-hognose-snake", name: "Western Hognose Snake", image: "images/western-hognose-snake.jpg" }
+  ];
+
+  const SITE_NAME = "ReptiGuide";
+  const list = document.getElementById("species-list");
+  const titleEl = document.getElementById("topbar-title");
+
+  // Build the buttons
+  SPECIES.forEach(s => {
+    const li = document.createElement("li");
+    const a = document.createElement("a");
+    a.className = "species-btn";
+    a.href = "#/" + s.slug;
+
+    const photo = document.createElement("span");
+    photo.className = "photo";
+    photo.style.backgroundImage = `url("${s.image}")`;
+
+    const label = document.createElement("span");
+    label.textContent = s.name;
+
+    a.append(photo, label);
+    li.appendChild(a);
+    list.appendChild(li);
+  });
+
+  // Simple hash router (works on GitHub Pages with just index.html)
+  function route() {
+    const slug = location.hash.replace(/^#\/?/, "");
+    const species = SPECIES.find(s => s.slug === slug);
+
+    if (species) {
+      document.body.className = "on-species";
+      titleEl.textContent = species.name;
+      document.title = species.name + " | " + SITE_NAME;
+    } else {
+      document.body.className = "on-home";
+      titleEl.textContent = SITE_NAME;
+      document.title = SITE_NAME;
+    }
+    window.scrollTo(0, 0);
+  }
+
+  window.addEventListener("hashchange", route);
+  route();
+</script>
+</body>
+</html>
