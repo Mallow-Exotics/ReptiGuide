@@ -69,7 +69,7 @@
     transition: color .2s, border-color .2s;
   }
   .back:hover { color: var(--accent); border-color: var(--accent); }
-  body.on-species .back { display: inline-flex; }
+  body.on-species .back, body.on-community .back { display: inline-flex; }
 
   /* ---------- Account area (top right) ---------- */
   [hidden] { display: none !important; }
@@ -384,6 +384,70 @@
     border-radius: 10px;
   }
 
+  /* ---------- Community ---------- */
+  .topbar-title { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .nav-link {
+    flex: none;
+    padding: 6px 12px;
+    font-size: 0.92rem;
+    color: var(--muted);
+    text-decoration: none;
+    border-radius: 999px;
+    transition: color .2s;
+  }
+  .nav-link:hover { color: var(--accent); }
+  body.on-community .nav-link { display: none; }
+
+  .community-hero h1 { font-size: clamp(2.4rem, 7vw, 3.6rem); }
+  .community-hero p { max-width: 52ch; }
+  .community-tools { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 28px; }
+
+  .post-card {
+    padding: 20px;
+    margin-bottom: 14px;
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: 14px;
+  }
+  .modal .post-card { background: var(--bg); }
+  .post-meta { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; margin-bottom: 10px; font-size: 0.85rem; color: var(--muted); }
+  .topic-tag {
+    padding: 1px 10px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: var(--accent);
+    border: 1px solid var(--line);
+    border-radius: 999px;
+  }
+  .post-card h3 { margin-bottom: 8px; font-family: var(--display); font-size: 1.35rem; line-height: 1.25; overflow-wrap: anywhere; }
+  .post-body { white-space: pre-wrap; overflow-wrap: anywhere; }
+  .post-image {
+    display: block;
+    max-width: 100%;
+    max-height: 420px;
+    margin-top: 14px;
+    border: 1px solid var(--line);
+    border-radius: 10px;
+  }
+  .post-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 14px; }
+  .post-actions .pill-btn { padding: 4px 12px; font-size: 0.8rem; }
+  .empty-note { color: var(--muted); }
+  #feed-more { display: block; margin: 8px auto 0; }
+
+  .modal select {
+    display: block;
+    width: 100%;
+    margin-top: 6px;
+    padding: 11px 12px;
+    font-family: var(--body);
+    font-size: 1rem;
+    color: var(--text);
+    background: var(--bg);
+    border: 1px solid var(--line);
+    border-radius: 10px;
+  }
+  .modal select:focus { outline: none; border-color: var(--accent); }
+
   /* ---------- Home ---------- */
   .container {
     max-width: 760px;
@@ -502,9 +566,10 @@
   .guide-section p + p { margin-top: 1em; }
 
   /* ---------- View switching ---------- */
-  #home, #species { display: none; }
+  #home, #species, #community { display: none; }
   body.on-home #home { display: block; }
   body.on-species #species { display: block; }
+  body.on-community #community { display: block; }
 
   @media (prefers-reduced-motion: reduce) {
     * { animation: none !important; transition: none !important; }
@@ -516,6 +581,8 @@
   <header class="topbar">
     <a class="back" href="#/" aria-label="Back to home">&larr; Back</a>
     <a class="topbar-title" id="topbar-title" href="#/">ReptiGuide</a>
+
+    <a class="nav-link" href="#/community">Community</a>
 
     <div class="auth-area pending" id="auth-area"></div>
   </header>
@@ -628,7 +695,7 @@
       </div>
 
       <section id="console-roles">
-        <p class="modal-sub">Create roles, rename them, and pick a color. The guide permissions work now. The others are saved for later and don't do anything yet.</p>
+        <p class="modal-sub">Create roles, rename them, and pick a color. Guide and community-moderation permissions work now. The others are saved for later and don't do anything yet.</p>
         <div id="roles-list"></div>
         <button class="pill-btn primary" id="add-role" type="button">+ Create role</button>
       </section>
@@ -679,6 +746,54 @@
     </div>
   </div>
 
+  <!-- NEW POST -->
+  <div class="modal-overlay" id="post-modal" role="dialog" aria-modal="true" aria-labelledby="post-heading">
+    <div class="modal editor">
+      <button class="modal-close" id="close-post" type="button" aria-label="Close">&times;</button>
+      <h2 id="post-heading">New post</h2>
+
+      <form id="post-form" novalidate>
+        <label>Topic
+          <select id="post-topic"></select>
+        </label>
+        <label>Title
+          <input id="post-title" type="text" maxlength="100" autocomplete="off">
+        </label>
+        <label>Post
+          <textarea id="post-body" maxlength="2000" rows="7"></textarea>
+        </label>
+
+        <div class="guide-photo-row">
+          <div class="guide-photo-preview" id="post-photo-preview">No picture</div>
+          <div class="avatar-actions">
+            <button class="pill-btn" id="post-photo-btn" type="button">Add a picture</button>
+            <button class="pill-btn" id="post-photo-remove" type="button">Remove</button>
+          </div>
+          <input type="file" id="post-photo-input" accept="image/*" hidden>
+        </div>
+
+        <p class="modal-sub">Keep it friendly and about reptiles. No swearing, NSFW, gore, or links. Posts with a picture are checked by a moderator before they show up.</p>
+        <button class="pill-btn primary submit" id="post-submit" type="submit">Post</button>
+      </form>
+
+      <p class="form-msg" id="post-msg" role="alert"></p>
+    </div>
+  </div>
+
+  <!-- MODERATION -->
+  <div class="modal-overlay" id="mod-modal" role="dialog" aria-modal="true" aria-labelledby="mod-heading">
+    <div class="modal console">
+      <button class="modal-close" id="close-mod" type="button" aria-label="Close">&times;</button>
+      <h2 id="mod-heading">Moderation</h2>
+      <div class="tabs">
+        <button type="button" id="mtab-pending" class="active">Waiting for approval</button>
+        <button type="button" id="mtab-reported">Reported</button>
+      </div>
+      <div id="mod-list"></div>
+      <p class="form-msg" id="mod-msg" role="alert"></p>
+    </div>
+  </div>
+
   <!-- HOME -->
   <main id="home" class="container">
     <section class="hero">
@@ -687,6 +802,19 @@
     </section>
 
     <ul class="species-list" id="species-list"></ul>
+  </main>
+
+  <!-- COMMUNITY -->
+  <main id="community" class="container">
+    <section class="hero community-hero">
+      <h1>Community</h1>
+      <p>Reptile advice and general reptile talk. Be kind, keep it about reptiles, and no links.</p>
+    </section>
+
+    <div class="community-tools" id="community-tools"></div>
+    <div id="feed"></div>
+    <button class="pill-btn" id="feed-more" type="button" hidden>Load more</button>
+    <p class="form-msg" id="feed-msg" role="status"></p>
   </main>
 
   <!-- SPECIES PAGE -->
@@ -720,7 +848,6 @@
     "Habitat Decoration",
     "Lighting",
     "Heating & Humidity",
-    "Diet",
     "Cohabitation & Behavior",
     "Habitat Control & Monitoring",
     "Treatment"
@@ -733,7 +860,6 @@
       "Habitat Decoration": `In the wild, leopard geckos are skittish and live in largely cluttered shrublands & forests. For them to truly feel comfort and safety in their enclosure, there are some basics. A minimum of 4 hides/caves is essential, and more is always better. Ideally, there should be a hide on the warm side, a hide in the middle, and a hide on the cool side. But what about the fourth hide? This is the humid hide. It should also be positioned on the middle, ideally a bit closer to the cool side. This hide must only have 1-2 openings, or else the humidity will spread too much. Inside, use damp moss, not too wet and not too dry. Spray it every 3 days to keep it moist. Ensure you have lots of other decorations, artificial or real plants, wood, or leaves.`,
       "Lighting": `While it's true that some leopard geckos do live in locations with particularly high UVB, they spend most of their day sleeping or hiding. How does the UVB benefit them at all if that's what they do? Well, leopard geckos do a very unique activity called cryptic basking. While they stay tucked away during the day, they like to keep a small part of their body out in the sun, usuall the tip of the tail, a leg, or sometimes the snout. This gives the leopard gecko all the UVB they need while staying tucked away. So, the myth that leopard geckos dont need UVB, is not true. So, for your leopard gecko, you will want to use a T5 HO linear UVB tube. While there are some smaller and cheaper coil UVB bulbs, they provide almost no UVB, and actually cost more, due to having to replace them every 3 months. With the linear UVB, you will want the power to be about 5-7% (or 5.0). Set it on top of the mesh lid of your terrarium.`,
       "Heating & Humidity": `Maintaining heat and humidity is one of the most important aspects of leopard gecko care. For the heating, use a Deep Dome lamp, ideally 5.5 inches, plugged into a dimming thermostat. Inside the dome, have a 75-watt to 100-watt Halogen basking heat bulb. Before you get your gecko, the heat must be maintained. The surface of the basking spot should be 88-92 degrees fahrenheit, and the ambience of the warm side should be 85-90 degrees fahrenheit. The cool side should remain below 75 degrees fahrenheit at all times. For humidity, the standard is 35-50% humidity. You might've heard higher than 40% is dangerous, which is not true as long as your terrarium has enough airflow. In the wild, leopard geckos live in semi-arid shrublands, but also semi-tropical forests, such as the Kamdi Corridor in Nepal.`,
-      "Diet": `Here`,
       "Cohabitation & Behavior": `Leopard geckos should always be housed individually. They are naturally solitary, highly territorial animals that do not benefit from social interaction with their own species. Grouping them together often leads to resource guarding, chronic stress, and aggressive fights. Housing two males together is particularly dangerous and will lead to severe violence. Even keeping females together or pairing a male with a female carries high risks of harm, so keeping one gecko per enclosure is strongly advised..  `,
       "Habitat Control & Monitoring": `Proper climate control is vital for a leopard gecko setup, requiring reliable electronics to keep your pet safe. Standard analog gauges are notoriously unreliable and prone to inaccurate readings, so you will want to equip your enclosure with a digital thermometer and digital hygrometer instead. Additionally, a quality dimming thermostat is essential to precisely regulate your heat lamp, while a simple plug-in timer set to a 12-hour cycle will automate both your heating and UVB lighting for a consistent day-and-night routine.`,
       "Treatment": `When you first bring your leopard gecko home, give them a mandatory two-week settling-in period with no handling at all to let them adjust to their new environment. After the first week, you can begin gentle interaction by simply placing your hand inside the enclosure or offering a light touch only if they seem receptive. Always move slowly, handle them gently, and avoid stressful environments, never turning them upside down. Once acclimated, keeping handling sessions to reasonable limits is key: cap adults at no more than 2 hours per day, juveniles at 30 minutes daily, and very young hatchlings to just 10 minutes a day—or ideally left unhandled until they are older.`
@@ -744,7 +870,6 @@
       "Habitat Decoration": `Here`,
       "Lighting": `Here`,
       "Heating & Humidity": `Crested geckos generally do not require supplemental heating as long as your room stays consistently between 70°F and 76°F (21°C to 24°C) during the day. Maintaining proper moisture levels is equally essential: aim for an average daytime humidity of 50% to 70% with a dry-out period, followed by a heavy evening misting that peaks humidity at 80% to 90% to trigger drinking behavior and support healthy shedding.`,
-      "Diet": `Here`,
       "Cohabitation & Behavior": `Here`,
       "Habitat Control & Monitoring": `Here`,
       "Treatment": `Here`
@@ -755,7 +880,6 @@
       "Habitat Decoration": `Here`,
       "Lighting": `Here`,
       "Heating & Humidity": `Here`,
-      "Diet": `Here`,
       "Cohabitation & Behavior": `Here`,
       "Habitat Control & Monitoring": `Here`,
       "Treatment": `Here`,
@@ -766,7 +890,6 @@
       "Habitat Decoration": `Here`,
       "Lighting": `Here`,
       "Heating & Humidity": `Here`,
-      "Diet": `Here`,
       "Cohabitation & Behavior": `Here`,
       "Habitat Control & Monitoring": `Here`,
       "Treatment": `Here`
@@ -878,7 +1001,12 @@
     const slug = location.hash.replace(/^#\/?/, "");
     const guide = GUIDES.find(g => g.slug === slug);
 
-    if (guide) {
+    if (slug === "community") {
+      document.body.className = "on-community";
+      titleEl.textContent = "Community";
+      document.title = "Community | " + SITE_NAME;
+      if (window.onCommunityOpen) window.onCommunityOpen(!!keepScroll);
+    } else if (guide) {
       document.body.className = "on-species";
       renderGuide(guide);
       titleEl.textContent = guide.name;
@@ -911,7 +1039,8 @@
   } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
   import {
     getFirestore, doc, getDoc, getDocs, setDoc, deleteDoc, updateDoc, writeBatch,
-    runTransaction, collection, query, limit
+    runTransaction, collection, query, limit,
+    orderBy, startAfter, where, increment, serverTimestamp
   } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
   /* =====================================================================
@@ -1385,9 +1514,13 @@
     To add one later, add a line here: { key: "some_key", label: "Name shown in the console" }
   */
   const PERMISSIONS = [
+    { key: "moderate_posts", label: "Moderate community posts" },
+    { key: "pin_posts",    label: "Pin posts" },
     { key: "create_guides", label: "Create guides" },
     { key: "edit_guides",  label: "Edit guides" },
     { key: "delete_guides", label: "Request guide deletion" },
+    { key: "mute_users",   label: "Mute users" },
+    { key: "ban_users",    label: "Ban users" },
   ];
 
   const isOwner = () => !!auth.currentUser && auth.currentUser.uid === OWNER_UID;
@@ -1753,6 +1886,7 @@
       del: guidesSeeded && can("delete_guides")
     };
     if (window.refreshGuideUI) window.refreshGuideUI();
+    refreshCommunity();
   }
 
   async function loadGuides() {
@@ -1913,7 +2047,8 @@
   });
 
   async function uniqueSlug(name) {
-    const base = name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 55) || "guide";
+    let base = name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 55) || "guide";
+    if (base === "community") base = "community-guide";
     let slug = base;
     for (let i = 2; i < 30; i++) {
       if (!(await getDoc(doc(db, "guides", slug))).exists()) return slug;
@@ -2071,6 +2206,428 @@
   $("ctab-requests").addEventListener("click", () => showTab("requests"));
 
   loadGuides();
+
+  // =====================================================================
+  //  COMMUNITY: posts, pictures, word filter, reports, moderation
+  // =====================================================================
+
+  const TOPICS = ["Advice", "Question", "Care help", "Showcase", "General"];
+  const PAGE_SIZE = 15;
+  const REPORT_LIMIT = 3;   // a post is hidden once it has this many reports (until a moderator reviews it)
+
+  const feedMsg = $("feed-msg"), postModal = $("post-modal"), postMsg = $("post-msg");
+  const modModal = $("mod-modal"), modMsg = $("mod-msg");
+  let feedPosts = [], feedLast = null, feedLoading = false, feedLoaded = false;
+  let modPending = 0, modTab = "pending", postImage = "";
+
+  TOPICS.forEach(t => {
+    const o = document.createElement("option");
+    o.value = t;
+    o.textContent = t;
+    $("post-topic").appendChild(o);
+  });
+
+  // ---- Word filter ----
+  /*
+    To block more words, add them (lowercase, separated by spaces) to BAD_PLAIN.
+    The slur list is stored scrambled (ROT13) so this file stays readable.
+    Reptile words like "sexing", "anal scale" and "cloaca" are allowed on purpose.
+  */
+  function rot13(s) { return s.replace(/[a-z]/g, ch => String.fromCharCode(((ch.charCodeAt(0) - 97 + 13) % 26) + 97)); }
+  const BAD_PLAIN = "fuck fucks fucked fucker fuckers fucking motherfucker motherfucking shit shits shitty shitting bullshit bitch bitches bastard bastards asshole assholes ass asses arse arsehole dick dicks dickhead cock cocks pussy pussies cunt cunts twat slut sluts whore whores prick damn damned goddamn crap piss pissed hell wanker bollocks porn porno pornography nude nudes nsfw hentai xxx onlyfans erotic fetish orgasm blowjob handjob cum cumshot dildo boob boobs tits titties horny masturbate masturbation jerkoff milf gore gory snuff torture tortured rape raped rapist molest molester pedophile kys".split(" ");
+  const BAD_ENCODED = "avttre avttref avttn avttnf snttbg snttbgf snt sntf ergneq ergneqf ergneqrq fcvp fcvpf puvax puvaxf xvxr xvxrf tbbx tbbxf jrgonpx genaal genaavrf qlxr pbba pbbaf cnxv ornare gbjryurnq enturnq".split(" ");
+  const BAD_SET = new Set([...BAD_PLAIN, ...BAD_ENCODED.map(rot13)]);
+  const BAD_PHRASES = ["kill yourself", "kill your self"];
+  const BAD_MSG = "Your post includes language that isn't allowed here. Please keep it friendly and about reptiles.";
+  const LEET = { "0": "o", "1": "i", "3": "e", "4": "a", "5": "s", "7": "t", "@": "a", "$": "s", "!": "i", "+": "t" };
+  const LEET_RE = /[013457@$!+]/g;
+
+  function filterTokens(text) {
+    const out = new Set();
+    const addFrom = s => s.split(/[^a-z]+/).forEach(t => { if (t) out.add(t.replace(/(.)\1{2,}/g, "$1")); });
+    const lower = text.toLowerCase();
+    addFrom(lower);                                              // normal words
+    addFrom(lower.replace(LEET_RE, ch => LEET[ch]));             // sh1t, f@ck, $hit
+    (lower.match(/\b(?:[a-z0-9@$][\s.\-_*]+){2,}[a-z0-9@$]\b/g) || []).forEach(run => {
+      addFrom(run.replace(/[\s.\-_*]+/g, "").replace(LEET_RE, ch => LEET[ch]));   // f u c k, f.u.c.k
+    });
+    return out;
+  }
+
+  function checkPostText(text) {
+    if (/https?:|www\.|\.(com|net|org|io|ly|xyz|gg)\b/i.test(text)) return "Links aren't allowed in posts.";
+    for (const t of filterTokens(text)) {
+      if (BAD_SET.has(t) || BAD_SET.has(t.replace(/(es|s|ed|er|ing)$/, ""))) return BAD_MSG;
+    }
+    const flat = " " + text.toLowerCase().replace(/[^a-z]+/g, " ") + " ";
+    if (BAD_PHRASES.some(p => flat.includes(" " + p + " "))) return BAD_MSG;
+    return "";
+  }
+
+  // ---- Helpers ----
+  function timeAgo(ts) {
+    const ms = ts && ts.toMillis ? ts.toMillis() : Date.now();
+    const s = Math.max(0, Math.floor((Date.now() - ms) / 1000));
+    if (s < 60) return "just now";
+    const m = Math.floor(s / 60);
+    if (m < 60) return m + " min ago";
+    const h = Math.floor(m / 60);
+    if (h < 24) return h + " hr ago";
+    const d = Math.floor(h / 24);
+    if (d < 30) return d + (d === 1 ? " day ago" : " days ago");
+    return new Date(ms).toLocaleDateString();
+  }
+
+  function postCard(p) {
+    const card = document.createElement("article");
+    card.className = "post-card";
+
+    const meta = document.createElement("div");
+    meta.className = "post-meta";
+    const tag = document.createElement("span");
+    tag.className = "topic-tag";
+    tag.textContent = p.topic || "General";
+    const who = document.createElement("span");
+    who.textContent = (p.authorName || "Someone") + " · " + timeAgo(p.createdAt);
+    meta.append(tag, who);
+
+    const h = document.createElement("h3");
+    h.textContent = p.title || "";
+    const body = document.createElement("div");
+    body.className = "post-body";
+    body.textContent = p.body || "";
+    card.append(meta, h, body);
+
+    const src = safePhoto(p.image);
+    if (src) {
+      const img = document.createElement("img");
+      img.className = "post-image";
+      img.alt = "Picture shared in this post";
+      img.loading = "lazy";
+      img.src = src;
+      card.appendChild(img);
+    }
+    return card;
+  }
+
+  function actionBtn(label, cls, handler) {
+    const b = document.createElement("button");
+    b.type = "button";
+    b.className = "pill-btn " + (cls || "");
+    b.textContent = label;
+    b.addEventListener("click", handler);
+    return b;
+  }
+
+  // ---- Feed ----
+  function renderCommunityTools() {
+    const box = $("community-tools");
+    box.replaceChildren();
+    if (auth.currentUser && profile) {
+      box.appendChild(actionBtn("New post", "primary", openPostEditor));
+      if (can("moderate_posts")) {
+        box.appendChild(actionBtn(modPending ? "Review (" + modPending + ")" : "Review", "", openModeration));
+      }
+    } else if (!auth.currentUser) {
+      box.appendChild(actionBtn("Sign in to post", "primary", () => openAuth("login")));
+    }
+  }
+
+  function renderFeed() {
+    const box = $("feed");
+    box.replaceChildren();
+    const user = auth.currentUser;
+    const visible = feedPosts.filter(p => (p.reportCount || 0) < REPORT_LIMIT);
+
+    if (!visible.length) {
+      const note = document.createElement("p");
+      note.className = "empty-note";
+      note.textContent = "No posts yet. Be the first to share something!";
+      box.appendChild(note);
+      return;
+    }
+
+    visible.forEach(p => {
+      const card = postCard(p);
+      const actions = document.createElement("div");
+      actions.className = "post-actions";
+      if (user && p.authorUid !== user.uid) actions.appendChild(actionBtn("Report", "", () => reportPost(p)));
+      if (user && (p.authorUid === user.uid || can("moderate_posts"))) {
+        actions.appendChild(actionBtn("Delete", "danger", () => deletePost(p)));
+      }
+      if (actions.children.length) card.appendChild(actions);
+      box.appendChild(card);
+    });
+  }
+
+  async function loadFeed(more) {
+    if (feedLoading) return;
+    feedLoading = true;
+    say(feedMsg, "");
+    try {
+      const parts = [orderBy("createdAt", "desc")];
+      if (more && feedLast) parts.push(startAfter(feedLast));
+      parts.push(limit(PAGE_SIZE));
+      const snap = await getDocs(query(collection(db, "posts"), ...parts));
+      if (!more) feedPosts = [];
+      snap.forEach(d => feedPosts.push({ id: d.id, ...d.data() }));
+      if (snap.docs.length) feedLast = snap.docs[snap.docs.length - 1];
+      $("feed-more").hidden = snap.size < PAGE_SIZE;
+      feedLoaded = true;
+      renderFeed();
+    } catch (err) {
+      console.error(err);
+      say(feedMsg, "Couldn't load posts right now. Please try again later.");
+    } finally {
+      feedLoading = false;
+    }
+  }
+
+  $("feed-more").addEventListener("click", () => loadFeed(true));
+
+  async function refreshModCount() {
+    if (!auth.currentUser || !can("moderate_posts")) { modPending = 0; return; }
+    try {
+      modPending = (await getDocs(query(collection(db, "pendingPosts"), limit(50)))).size;
+      renderCommunityTools();
+    } catch (err) { console.error(err); }
+  }
+
+  window.onCommunityOpen = function (refreshOnly) {
+    renderCommunityTools();
+    if (refreshOnly && feedLoaded) renderFeed(); else loadFeed(false);
+    refreshModCount();
+  };
+
+  function refreshCommunity() {
+    if (!document.body.classList.contains("on-community")) return;
+    renderCommunityTools();
+    if (feedLoaded) renderFeed();
+    refreshModCount();
+  }
+
+  async function deletePost(p) {
+    if (!window.confirm("Delete this post?")) return;
+    try {
+      await deleteDoc(doc(db, "posts", p.id));
+      feedPosts = feedPosts.filter(x => x.id !== p.id);
+      renderFeed();
+      say(feedMsg, "Post deleted.", true);
+    } catch (err) {
+      console.error(err);
+      say(feedMsg, "Couldn't delete that post.");
+    }
+  }
+
+  async function reportPost(p) {
+    if (!window.confirm("Report this post to the moderators?")) return;
+    try {
+      const uid = auth.currentUser.uid;
+      const batch = writeBatch(db);
+      batch.set(doc(db, "reports", p.id + "_" + uid), { postId: p.id, reporterUid: uid, createdAt: Date.now() });
+      batch.update(doc(db, "posts", p.id), { reportCount: increment(1) });
+      await batch.commit();
+      p.reportCount = (p.reportCount || 0) + 1;
+      renderFeed();
+      say(feedMsg, "Thanks for letting us know. A moderator will take a look.", true);
+    } catch (err) {
+      console.error(err);
+      say(feedMsg, err.code === "permission-denied" ? "You've already reported this post." : "Couldn't send your report. Please try again.");
+    }
+  }
+
+  // ---- New post ----
+  function renderPostPhoto() {
+    const box = $("post-photo-preview");
+    const p = safePhoto(postImage);
+    box.style.backgroundImage = p ? 'url("' + p + '")' : "none";
+    box.textContent = p ? "" : "No picture";
+    $("post-photo-remove").hidden = !p;
+  }
+
+  function openPostEditor() {
+    if (!auth.currentUser || !profile) return openAuth("login");
+    $("post-form").reset();
+    postImage = "";
+    renderPostPhoto();
+    say(postMsg, "");
+    open(postModal);
+  }
+  $("close-post").addEventListener("click", () => close(postModal));
+
+  $("post-photo-btn").addEventListener("click", () => $("post-photo-input").click());
+  $("post-photo-remove").addEventListener("click", () => { postImage = ""; renderPostPhoto(); });
+  $("post-photo-input").addEventListener("change", async () => {
+    const input = $("post-photo-input");
+    const file = input.files[0];
+    input.value = "";
+    if (!file) return;
+    if (!file.type.startsWith("image/")) return say(postMsg, "Please choose an image file.");
+    if (file.size > 15 * 1024 * 1024) return say(postMsg, "That image is too large (15 MB max).");
+    say(postMsg, "");
+    try {
+      postImage = await resizeImageMax(file, 800, 800);
+      renderPostPhoto();
+    } catch (err) {
+      console.error(err);
+      say(postMsg, "Couldn't use that image. Try a different one.");
+    }
+  });
+
+  $("post-form").addEventListener("submit", async e => {
+    e.preventDefault();
+    const user = auth.currentUser;
+    if (!user || !profile) return say(postMsg, "Please sign in first.");
+
+    const title = $("post-title").value.trim();
+    const body = $("post-body").value.trim();
+    const topic = $("post-topic").value;
+    if (title.length < 3) return say(postMsg, "Give your post a title (at least 3 characters).");
+    if (!body) return say(postMsg, "Write something in your post.");
+
+    const bad = checkPostText(title) || checkPostText(body);
+    if (bad) return say(postMsg, bad);
+
+    let last = 0;
+    try { last = Number(localStorage.getItem("reptiguideLastPost") || 0); } catch (_) {}
+    if (Date.now() - last < 60000) return say(postMsg, "Please wait a minute between posts.");
+
+    const needsReview = !!postImage;
+    const col = needsReview ? "pendingPosts" : "posts";
+    const data = {
+      title, body, topic,
+      image: postImage || "",
+      authorUid: user.uid,
+      authorName: profile.username,
+      createdAt: serverTimestamp(),
+      reportCount: 0
+    };
+
+    $("post-submit").disabled = true;
+    say(postMsg, "");
+    try {
+      await setDoc(doc(collection(db, col)), data);
+      try { localStorage.setItem("reptiguideLastPost", String(Date.now())); } catch (_) {}
+      close(postModal);
+      if (needsReview) {
+        say(feedMsg, "Thanks! Your post has a picture, so a moderator will review it before it shows up.", true);
+      } else {
+        await loadFeed(false);
+        say(feedMsg, "Your post is live.", true);
+      }
+    } catch (err) {
+      console.error(err);
+      say(postMsg, err.code === "permission-denied"
+        ? "That post couldn't be saved. Check that it follows the community rules."
+        : "Couldn't post right now. Please try again.");
+    } finally {
+      $("post-submit").disabled = false;
+    }
+  });
+
+  // ---- Moderation (owner, or anyone with the "Moderate community posts" permission) ----
+  function openModeration() {
+    if (!can("moderate_posts")) return;
+    setModTab("pending");
+    open(modModal);
+  }
+  $("close-mod").addEventListener("click", () => close(modModal));
+  $("mtab-pending").addEventListener("click", () => setModTab("pending"));
+  $("mtab-reported").addEventListener("click", () => setModTab("reported"));
+
+  function setModTab(t) {
+    modTab = t;
+    $("mtab-pending").classList.toggle("active", t === "pending");
+    $("mtab-reported").classList.toggle("active", t === "reported");
+    loadModList();
+  }
+
+  async function loadModList() {
+    const box = $("mod-list");
+    box.textContent = "Loading...";
+    say(modMsg, "");
+    try {
+      const items = [];
+      if (modTab === "pending") {
+        const snap = await getDocs(query(collection(db, "pendingPosts"), orderBy("createdAt", "asc"), limit(50)));
+        snap.forEach(d => items.push({ id: d.id, ...d.data() }));
+        modPending = items.length;
+        renderCommunityTools();
+      } else {
+        const snap = await getDocs(query(collection(db, "posts"), where("reportCount", ">", 0), limit(50)));
+        snap.forEach(d => items.push({ id: d.id, ...d.data() }));
+      }
+
+      box.replaceChildren();
+      if (!items.length) {
+        box.textContent = modTab === "pending" ? "Nothing is waiting for approval." : "No reported posts.";
+        return;
+      }
+
+      items.forEach(p => {
+        const card = postCard(p);
+        const actions = document.createElement("div");
+        actions.className = "post-actions";
+        const done = msg => { card.remove(); say(modMsg, msg, true); refreshModCount(); if (!box.children.length) box.textContent = "All done."; };
+        const fail = err => { console.error(err); say(modMsg, "That didn't work. Please try again."); };
+
+        if (modTab === "pending") {
+          actions.append(
+            actionBtn("Approve", "primary", async () => {
+              try {
+                const batch = writeBatch(db);
+                batch.set(doc(db, "posts", p.id), {
+                  title: p.title, body: p.body, topic: p.topic, image: p.image || "",
+                  authorUid: p.authorUid, authorName: p.authorName,
+                  createdAt: serverTimestamp(), reportCount: 0
+                });
+                batch.delete(doc(db, "pendingPosts", p.id));
+                await batch.commit();
+                done("Approved. It's live now.");
+                loadFeed(false);
+              } catch (err) { fail(err); }
+            }),
+            actionBtn("Reject", "danger", async () => {
+              if (!window.confirm("Reject and delete this post?")) return;
+              try { await deleteDoc(doc(db, "pendingPosts", p.id)); done("Rejected."); }
+              catch (err) { fail(err); }
+            })
+          );
+        } else {
+          const count = document.createElement("span");
+          count.className = "empty-note";
+          count.textContent = (p.reportCount || 0) + " report" + (p.reportCount === 1 ? "" : "s") + (p.reportCount >= REPORT_LIMIT ? " (hidden)" : "");
+          actions.append(
+            count,
+            actionBtn("Keep it", "", async () => {
+              try { await updateDoc(doc(db, "posts", p.id), { reportCount: 0 }); done("Post kept."); loadFeed(false); }
+              catch (err) { fail(err); }
+            }),
+            actionBtn("Delete", "danger", async () => {
+              if (!window.confirm("Delete this post for good?")) return;
+              try { await deleteDoc(doc(db, "posts", p.id)); done("Post deleted."); loadFeed(false); }
+              catch (err) { fail(err); }
+            })
+          );
+        }
+        card.appendChild(actions);
+        box.appendChild(card);
+      });
+    } catch (err) {
+      console.error(err);
+      box.textContent = "";
+      say(modMsg, "Couldn't load that list. Check that your Firestore rules are published.");
+    }
+  }
+
+  document.addEventListener("keydown", e => {
+    if (e.key !== "Escape") return;
+    close(postModal);
+    close(modModal);
+  });
+
+  // Direct link to #/community
+  if (document.body.classList.contains("on-community")) window.onCommunityOpen(false);
 
   finishEmailLink();
 </script>
