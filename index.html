@@ -15,6 +15,7 @@
     --text: #e8efe9;
     --muted: #93a79a;
     --accent: #b8e04a;
+    --danger: #ff8a7a;
     --display: "Fraunces", Georgia, serif;
     --body: "Instrument Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
   }
@@ -69,6 +70,152 @@
   }
   .back:hover { color: var(--accent); border-color: var(--accent); }
   body.on-species .back { display: inline-flex; }
+
+  /* ---------- Account area (top right) ---------- */
+  .auth-area {
+    margin-left: auto;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    font-size: 0.9rem;
+  }
+  .auth-area .who { color: var(--muted); }
+  .auth-area .who strong { color: var(--text); font-weight: 600; }
+
+  .pill-btn {
+    font-family: var(--body);
+    font-size: 0.9rem;
+    font-weight: 500;
+    color: var(--text);
+    background: transparent;
+    border: 1px solid var(--line);
+    border-radius: 999px;
+    padding: 7px 16px;
+    cursor: pointer;
+    transition: color .2s, border-color .2s, background .2s;
+  }
+  .pill-btn:hover { color: var(--accent); border-color: var(--accent); }
+  .pill-btn.primary { background: var(--accent); border-color: var(--accent); color: #0d1511; }
+  .pill-btn.primary:hover { background: #cdf060; color: #0d1511; }
+
+  /* ---------- Account modal ---------- */
+  .modal-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 50;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+    background: rgba(5, 9, 7, 0.7);
+    backdrop-filter: blur(4px);
+    -webkit-backdrop-filter: blur(4px);
+  }
+  .modal-overlay.open { display: flex; }
+
+  .modal {
+    position: relative;
+    width: 100%;
+    max-width: 400px;
+    padding: 32px 28px 28px;
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: 16px;
+  }
+
+  .modal-close {
+    position: absolute;
+    top: 12px;
+    right: 14px;
+    background: none;
+    border: none;
+    color: var(--muted);
+    font-size: 1.6rem;
+    line-height: 1;
+    cursor: pointer;
+  }
+  .modal-close:hover { color: var(--text); }
+
+  .modal h2 {
+    font-family: var(--display);
+    font-size: 1.7rem;
+    margin-bottom: 20px;
+  }
+
+  .tabs {
+    display: flex;
+    gap: 4px;
+    padding: 4px;
+    margin-bottom: 20px;
+    background: var(--bg);
+    border-radius: 10px;
+  }
+  .tabs button {
+    flex: 1;
+    padding: 8px;
+    font-family: var(--body);
+    font-size: 0.9rem;
+    font-weight: 500;
+    color: var(--muted);
+    background: transparent;
+    border: none;
+    border-radius: 7px;
+    cursor: pointer;
+  }
+  .tabs button.active { background: var(--line); color: var(--text); }
+
+  .google-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    width: 100%;
+    padding: 11px;
+    font-family: var(--body);
+    font-size: 0.95rem;
+    font-weight: 500;
+    color: #1f1f1f;
+    background: #fff;
+    border: none;
+    border-radius: 10px;
+    cursor: pointer;
+  }
+  .google-btn:hover { background: #f1f1f1; }
+  .google-btn svg { width: 18px; height: 18px; }
+
+  .divider {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin: 18px 0;
+    color: var(--muted);
+    font-size: 0.8rem;
+  }
+  .divider::before, .divider::after { content: ""; flex: 1; height: 1px; background: var(--line); }
+
+  .modal label {
+    display: block;
+    margin-bottom: 14px;
+    font-size: 0.85rem;
+    color: var(--muted);
+  }
+  .modal input {
+    display: block;
+    width: 100%;
+    margin-top: 6px;
+    padding: 11px 12px;
+    font-family: var(--body);
+    font-size: 1rem;
+    color: var(--text);
+    background: var(--bg);
+    border: 1px solid var(--line);
+    border-radius: 10px;
+  }
+  .modal input:focus { outline: none; border-color: var(--accent); }
+
+  .modal .submit { width: 100%; padding: 11px; margin-top: 4px; }
+
+  .form-msg { min-height: 1.3em; margin-top: 14px; font-size: 0.88rem; color: var(--danger); }
 
   /* ---------- Home ---------- */
   .container {
@@ -162,7 +309,7 @@
 
   .species-btn:focus-visible { box-shadow: 0 0 0 3px rgba(184, 224, 74, .35); }
 
-  /* ---------- Species page (blank for now) ---------- */
+  /* ---------- Species page ---------- */
   .species-page { min-height: calc(100vh - 64px); }
 
   .guide-section {
@@ -202,7 +349,43 @@
   <header class="topbar">
     <a class="back" href="#/" aria-label="Back to home">&larr; Back</a>
     <a class="topbar-title" id="topbar-title" href="#/">ReptiGuide</a>
+
+    <div class="auth-area" id="auth-area">
+      <button class="pill-btn primary" id="open-auth" type="button">Sign in</button>
+    </div>
   </header>
+
+  <!-- ACCOUNT POPUP -->
+  <div class="modal-overlay" id="auth-modal" role="dialog" aria-modal="true" aria-labelledby="auth-heading">
+    <div class="modal">
+      <button class="modal-close" id="close-auth" type="button" aria-label="Close">&times;</button>
+      <h2 id="auth-heading">Welcome</h2>
+
+      <div class="tabs">
+        <button type="button" id="tab-login" class="active">Log in</button>
+        <button type="button" id="tab-signup">Create account</button>
+      </div>
+
+      <button class="google-btn" id="google-btn" type="button">
+        <svg viewBox="0 0 48 48" aria-hidden="true"><path fill="#EA4335" d="M24 9.5c3.5 0 6.6 1.2 9.1 3.6l6.8-6.8C35.8 2.4 30.3 0 24 0 14.6 0 6.5 5.4 2.6 13.2l7.9 6.1C12.4 13.6 17.7 9.5 24 9.5z"/><path fill="#4285F4" d="M46.5 24.5c0-1.6-.1-3.1-.4-4.5H24v9h12.7c-.6 3-2.3 5.5-4.8 7.2l7.5 5.8c4.4-4.1 7.1-10.1 7.1-17.5z"/><path fill="#FBBC05" d="M10.5 28.7c-.5-1.4-.8-3-.8-4.7s.3-3.2.8-4.7l-7.9-6.1C.9 16.4 0 20.1 0 24s.9 7.6 2.6 10.8l7.9-6.1z"/><path fill="#34A853" d="M24 48c6.5 0 11.9-2.1 15.9-5.8l-7.5-5.8c-2.1 1.4-4.8 2.3-8.4 2.3-6.3 0-11.6-4.1-13.5-9.8l-7.9 6.1C6.5 42.6 14.6 48 24 48z"/></svg>
+        Continue with Google
+      </button>
+
+      <div class="divider">or use a username</div>
+
+      <form id="auth-form" novalidate>
+        <label>Username
+          <input id="auth-username" type="text" autocomplete="username" maxlength="20" required>
+        </label>
+        <label>Password
+          <input id="auth-password" type="password" autocomplete="current-password" required>
+        </label>
+        <button class="pill-btn primary submit" id="auth-submit" type="submit">Log in</button>
+      </form>
+
+      <p class="form-msg" id="auth-msg" role="alert"></p>
+    </div>
+  </div>
 
   <!-- HOME -->
   <main id="home" class="container">
@@ -214,7 +397,7 @@
     <ul class="species-list" id="species-list"></ul>
   </main>
 
-  <!-- SPECIES PAGE (blank) -->
+  <!-- SPECIES PAGE -->
   <main id="species" class="species-page"></main>
 
 <script>
@@ -282,7 +465,7 @@
       "Treatment": `Here`,
     },
 
-        "smooth-knob-tailed-gecko": {
+    "smooth-knob-tailed-gecko": {
       "Enclosure Size": `Here`,
       "Habitat Decoration": `Here`,
       "Lighting": `Here`,
@@ -366,6 +549,146 @@
 
   window.addEventListener("hashchange", route);
   route();
+</script>
+
+<!-- ======================= ACCOUNTS (Firebase) ======================= -->
+<script type="module">
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+  import {
+    getAuth, onAuthStateChanged, signInWithPopup, GoogleAuthProvider,
+    createUserWithEmailAndPassword, signInWithEmailAndPassword,
+    updateProfile, signOut
+  } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+
+  /* =====================================================================
+     PASTE YOUR FIREBASE SETTINGS HERE
+     (Firebase console > Project settings > Your apps > Web app > Config)
+     ===================================================================== */
+  const firebaseConfig = {
+    apiKey: "PASTE_YOUR_API_KEY",
+    authDomain: "PASTE_YOUR_AUTH_DOMAIN",
+    projectId: "PASTE_YOUR_PROJECT_ID",
+    appId: "PASTE_YOUR_APP_ID"
+  };
+  /* ===================== END OF FIREBASE SETTINGS ===================== */
+
+  const configured = !firebaseConfig.apiKey.startsWith("PASTE");
+  const auth = configured ? getAuth(initializeApp(firebaseConfig)) : null;
+
+  // --- Elements ---
+  const $ = id => document.getElementById(id);
+  const modal = $("auth-modal"), authArea = $("auth-area"), msg = $("auth-msg");
+  const form = $("auth-form"), userIn = $("auth-username"), passIn = $("auth-password");
+  const submitBtn = $("auth-submit");
+  let mode = "login"; // or "signup"
+
+  // Usernames become a hidden email address so Firebase can store them.
+  const toEmail = u => u.toLowerCase() + "@users.reptiguide.app";
+
+  function showMsg(text) { msg.textContent = text || ""; }
+
+  function setMode(m) {
+    mode = m;
+    $("tab-login").classList.toggle("active", m === "login");
+    $("tab-signup").classList.toggle("active", m === "signup");
+    submitBtn.textContent = m === "login" ? "Log in" : "Create account";
+    $("auth-heading").textContent = m === "login" ? "Welcome back" : "Join ReptiGuide";
+    passIn.autocomplete = m === "login" ? "current-password" : "new-password";
+    showMsg(configured ? "" : "Accounts aren't set up yet. Add your Firebase settings in index.html.");
+  }
+
+  function openModal(m) { setMode(m || "login"); modal.classList.add("open"); userIn.focus(); }
+  function closeModal() { modal.classList.remove("open"); form.reset(); showMsg(""); }
+
+  function friendlyError(err) {
+    switch (err.code) {
+      case "auth/email-already-in-use": return "That username is already taken.";
+      case "auth/invalid-credential":
+      case "auth/user-not-found":
+      case "auth/wrong-password": return "Incorrect username or password.";
+      case "auth/too-many-requests": return "Too many attempts. Please wait a moment and try again.";
+      case "auth/unauthorized-domain": return "This website's address isn't authorized in Firebase yet.";
+      case "auth/operation-not-allowed": return "This sign-in method isn't turned on in Firebase yet.";
+      case "auth/popup-closed-by-user":
+      case "auth/cancelled-popup-request": return "";
+      default: return "Something went wrong. Please try again.";
+    }
+  }
+
+  // --- Events ---
+  $("open-auth").addEventListener("click", () => openModal("login"));
+  $("close-auth").addEventListener("click", closeModal);
+  modal.addEventListener("click", e => { if (e.target === modal) closeModal(); });
+  document.addEventListener("keydown", e => { if (e.key === "Escape") closeModal(); });
+  $("tab-login").addEventListener("click", () => setMode("login"));
+  $("tab-signup").addEventListener("click", () => setMode("signup"));
+
+  $("google-btn").addEventListener("click", async () => {
+    if (!configured) return showMsg("Accounts aren't set up yet. Add your Firebase settings in index.html.");
+    try {
+      await signInWithPopup(auth, new GoogleAuthProvider());
+      closeModal();
+    } catch (err) { showMsg(friendlyError(err)); }
+  });
+
+  form.addEventListener("submit", async e => {
+    e.preventDefault();
+    if (!configured) return showMsg("Accounts aren't set up yet. Add your Firebase settings in index.html.");
+
+    const username = userIn.value.trim();
+    const password = passIn.value;
+
+    if (!/^[A-Za-z0-9_]{3,20}$/.test(username))
+      return showMsg("Username must be 3-20 characters: letters, numbers, or underscores.");
+    if (mode === "signup" && password.length < 8)
+      return showMsg("Password must be at least 8 characters.");
+    if (!password) return showMsg("Please enter your password.");
+
+    submitBtn.disabled = true;
+    try {
+      if (mode === "signup") {
+        const cred = await createUserWithEmailAndPassword(auth, toEmail(username), password);
+        await updateProfile(cred.user, { displayName: username });
+      } else {
+        await signInWithEmailAndPassword(auth, toEmail(username), password);
+      }
+      closeModal();
+    } catch (err) {
+      showMsg(friendlyError(err));
+    } finally {
+      submitBtn.disabled = false;
+    }
+  });
+
+  // --- Top bar updates when you log in or out ---
+  function renderAuthArea(user) {
+    authArea.replaceChildren();
+    if (user) {
+      const who = document.createElement("span");
+      who.className = "who";
+      who.append("Signed in as ");
+      const strong = document.createElement("strong");
+      strong.textContent = user.displayName || "friend";
+      who.appendChild(strong);
+
+      const out = document.createElement("button");
+      out.className = "pill-btn";
+      out.type = "button";
+      out.textContent = "Log out";
+      out.addEventListener("click", () => signOut(auth));
+
+      authArea.append(who, out);
+    } else {
+      const btn = document.createElement("button");
+      btn.className = "pill-btn primary";
+      btn.type = "button";
+      btn.textContent = "Sign in";
+      btn.addEventListener("click", () => openModal("login"));
+      authArea.appendChild(btn);
+    }
+  }
+
+  if (configured) onAuthStateChanged(auth, renderAuthArea);
 </script>
 </body>
 </html>
