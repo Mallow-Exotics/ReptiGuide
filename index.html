@@ -334,6 +334,56 @@
     margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--line);
   }
 
+  /* ---------- Guide editing ---------- */
+  .guide-tools { display: flex; justify-content: flex-end; margin-bottom: 8px; }
+  .guide-tools + .guide-section { border-top: none; }
+
+  .new-guide-btn {
+    width: 100%;
+    min-height: 72px;
+    font-family: var(--display);
+    font-size: 1.2rem;
+    color: var(--muted);
+    background: transparent;
+    border: 1px dashed var(--line);
+    border-radius: 14px;
+    cursor: pointer;
+    transition: color .2s, border-color .2s;
+  }
+  .new-guide-btn:hover { color: var(--accent); border-color: var(--accent); }
+
+  .modal.editor { max-width: 720px; }
+  .modal textarea {
+    display: block;
+    width: 100%;
+    min-height: 110px;
+    margin-top: 6px;
+    padding: 11px 12px;
+    font-family: var(--body);
+    font-size: 0.95rem;
+    line-height: 1.5;
+    color: var(--text);
+    background: var(--bg);
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    resize: vertical;
+  }
+  .modal textarea:focus { outline: none; border-color: var(--accent); }
+
+  .guide-photo-row { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; margin: 4px 0 20px; }
+  .guide-photo-preview {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 180px;
+    height: 90px;
+    font-size: 0.8rem;
+    color: var(--muted);
+    background: var(--bg) center / cover no-repeat;
+    border: 1px solid var(--line);
+    border-radius: 10px;
+  }
+
   /* ---------- Home ---------- */
   .container {
     max-width: 760px;
@@ -574,10 +624,11 @@
       <div class="tabs">
         <button type="button" id="ctab-roles" class="active">Roles</button>
         <button type="button" id="ctab-members">Members</button>
+        <button type="button" id="ctab-requests">Requests</button>
       </div>
 
       <section id="console-roles">
-        <p class="modal-sub">Create roles, rename them, and pick a color. Permissions are saved but don't do anything yet.</p>
+        <p class="modal-sub">Create roles, rename them, and pick a color. The guide permissions work now. The others are saved for later and don't do anything yet.</p>
         <div id="roles-list"></div>
         <button class="pill-btn primary" id="add-role" type="button">+ Create role</button>
       </section>
@@ -587,7 +638,44 @@
         <div id="members-list"></div>
       </section>
 
+      <section id="console-requests" hidden>
+        <p class="modal-sub">People with the "Request guide deletion" permission send requests here. A guide is only deleted when you approve.</p>
+        <div id="requests-list"></div>
+      </section>
+
       <p class="form-msg" id="console-msg" role="alert"></p>
+    </div>
+  </div>
+
+  <!-- GUIDE EDITOR -->
+  <div class="modal-overlay" id="guide-modal" role="dialog" aria-modal="true" aria-labelledby="guide-heading">
+    <div class="modal editor">
+      <button class="modal-close" id="close-guide" type="button" aria-label="Close">&times;</button>
+      <h2 id="guide-heading">Edit guide</h2>
+
+      <form id="guide-form" novalidate>
+        <label>Guide name
+          <input id="guide-name" type="text" maxlength="40" autocomplete="off">
+        </label>
+
+        <div class="guide-photo-row">
+          <div class="guide-photo-preview" id="guide-photo-preview">No picture</div>
+          <div class="avatar-actions">
+            <button class="pill-btn" id="guide-photo-btn" type="button">Choose picture</button>
+            <button class="pill-btn" id="guide-photo-remove" type="button">Remove</button>
+          </div>
+          <input type="file" id="guide-photo-input" accept="image/*" hidden>
+        </div>
+
+        <div id="guide-sections"></div>
+
+        <div class="role-actions">
+          <button class="pill-btn primary" id="guide-save" type="submit">Save guide</button>
+          <button class="pill-btn danger" id="guide-delete" type="button" hidden>Delete guide</button>
+        </div>
+      </form>
+
+      <p class="form-msg" id="guide-msg" role="alert"></p>
     </div>
   </div>
 
@@ -688,30 +776,77 @@
   const list = document.getElementById("species-list");
   const titleEl = document.getElementById("topbar-title");
 
-  // Build the buttons
-  SPECIES.forEach(s => {
-    const li = document.createElement("li");
-    const a = document.createElement("a");
-    a.className = "species-btn";
-    a.href = "#/" + s.slug;
+  // ---- Guides ----
+  // The guides listed above are the built-in ones. The first time the owner signs in, they are
+  // copied to the database. After that, guides are created, edited and deleted on the website.
+  const BUILTIN_GUIDES = SPECIES.map((s, i) => ({
+    slug: s.slug, name: s.name, photo: s.image, sections: CONTENT[s.slug] || {}, order: i + 1
+  }));
+  let GUIDES = BUILTIN_GUIDES;
+  window.BUILTIN_GUIDES = BUILTIN_GUIDES;
+  window.SECTIONS = SECTIONS;
+  window.guidePerms = { create: false, edit: false, del: false };
+  window.getGuide = slug => GUIDES.find(g => g.slug === slug);
 
-    const photo = document.createElement("span");
-    photo.className = "photo";
-    photo.style.backgroundImage = `url("${s.image}")`;
+  // Only pictures from this site's /images folder or uploaded (resized) pictures are shown
+  function safePhoto(p) {
+    return typeof p === "string" &&
+      /^(data:image\/(jpeg|png|webp);base64,[A-Za-z0-9+\/=]+|images\/[A-Za-z0-9._-]+)$/.test(p) ? p : "";
+  }
+  window.safePhoto = safePhoto;
 
-    const label = document.createElement("span");
-    label.textContent = s.name;
+  // Build the buttons on the home page
+  function renderHome() {
+    list.replaceChildren();
 
-    a.append(photo, label);
-    li.appendChild(a);
-    list.appendChild(li);
-  });
+    GUIDES.forEach(g => {
+      const li = document.createElement("li");
+      const a = document.createElement("a");
+      a.className = "species-btn";
+      a.href = "#/" + g.slug;
 
-  // Build the scrolling sections for one reptile
-  function renderSpecies(slug) {
+      const photo = document.createElement("span");
+      photo.className = "photo";
+      const p = safePhoto(g.photo);
+      if (p) photo.style.backgroundImage = 'url("' + p + '")';
+
+      const label = document.createElement("span");
+      label.textContent = g.name;
+
+      a.append(photo, label);
+      li.appendChild(a);
+      list.appendChild(li);
+    });
+
+    if (window.guidePerms.create) {
+      const li = document.createElement("li");
+      const b = document.createElement("button");
+      b.type = "button";
+      b.className = "new-guide-btn";
+      b.textContent = "+ New guide";
+      b.addEventListener("click", () => { if (window.openGuideEditor) window.openGuideEditor(null); });
+      li.appendChild(b);
+      list.appendChild(li);
+    }
+  }
+
+  // Build the scrolling sections for one guide
+  function renderGuide(g) {
     const container = document.createElement("div");
     container.className = "container";
-    const text = CONTENT[slug] || {};
+    const text = g.sections || {};
+
+    if (window.guidePerms.edit) {
+      const tools = document.createElement("div");
+      tools.className = "guide-tools";
+      const edit = document.createElement("button");
+      edit.type = "button";
+      edit.className = "pill-btn";
+      edit.textContent = "Edit guide";
+      edit.addEventListener("click", () => { if (window.openGuideEditor) window.openGuideEditor(g.slug); });
+      tools.appendChild(edit);
+      container.appendChild(tools);
+    }
 
     SECTIONS.forEach(title => {
       const section = document.createElement("section");
@@ -721,7 +856,7 @@
       h2.textContent = title;
       section.appendChild(h2);
 
-      (text[title] || "Coming soon").trim().split(/\n\s*\n/).forEach(para => {
+      String(text[title] || "Coming soon").trim().split(/\n\s*\n/).forEach(para => {
         const p = document.createElement("p");
         p.textContent = para.trim();
         section.appendChild(p);
@@ -734,24 +869,29 @@
   }
 
   // Simple hash router (works on GitHub Pages with just index.html)
-  function route() {
+  function route(keepScroll) {
     const slug = location.hash.replace(/^#\/?/, "");
-    const species = SPECIES.find(s => s.slug === slug);
+    const guide = GUIDES.find(g => g.slug === slug);
 
-    if (species) {
+    if (guide) {
       document.body.className = "on-species";
-      renderSpecies(species.slug);
-      titleEl.textContent = species.name;
-      document.title = species.name + " | " + SITE_NAME;
+      renderGuide(guide);
+      titleEl.textContent = guide.name;
+      document.title = guide.name + " | " + SITE_NAME;
     } else {
       document.body.className = "on-home";
       titleEl.textContent = SITE_NAME;
       document.title = SITE_NAME;
     }
-    window.scrollTo(0, 0);
+    if (!keepScroll) window.scrollTo(0, 0);
   }
 
-  window.addEventListener("hashchange", route);
+  // Called by the account script when guides load or permissions change
+  window.setGuides = guides => { GUIDES = guides || BUILTIN_GUIDES; renderHome(); route(true); };
+  window.refreshGuideUI = () => { renderHome(); route(true); };
+
+  window.addEventListener("hashchange", () => route());
+  renderHome();
   route();
 </script>
 
@@ -829,6 +969,7 @@
   let myRoleIds = [];
   let myRoles = [];
   let rolesById = {};
+  let myPerms = new Set();
   let settingUp = false;     // true while the "create username + password" step is saving
   let verifiedSignup = false; // true after an email link was verified, before the account exists
   try { verifiedSignup = sessionStorage.getItem(VERIFIED_KEY) === "1"; } catch (_) {}
@@ -1197,6 +1338,7 @@
     profile = null;
     myRoles = [];
     myRoleIds = [];
+    myPerms = new Set();
     let loadFailed = false;
 
     if (user) {
@@ -1215,6 +1357,7 @@
     }
 
     renderAuthArea();
+    syncGuidePerms();
 
     if (!user) {
       close(settingsModal);
@@ -1239,7 +1382,9 @@
   const PERMISSIONS = [
     { key: "delete_posts", label: "Delete posts" },
     { key: "pin_posts",    label: "Pin posts" },
+    { key: "create_guides", label: "Create guides" },
     { key: "edit_guides",  label: "Edit guides" },
+    { key: "delete_guides", label: "Request guide deletion" },
     { key: "mute_users",   label: "Mute users" },
     { key: "ban_users",    label: "Ban users" },
     { key: "view_reports", label: "View reports" }
@@ -1282,13 +1427,18 @@
     myRoles = [];
     myRoleIds = [];
     try {
-      if (user.uid === OWNER_UID) await ensureOwner(user);
+      if (user.uid === OWNER_UID) {
+        await ensureOwner(user);
+        try { await seedGuidesIfNeeded(); } catch (err) { console.error(err); }
+        refreshRequestCount();
+      }
       const [roles, assign] = await Promise.all([
         fetchRoles(),
         getDoc(doc(db, "roleAssignments", user.uid))
       ]);
       rolesById = roles;
       myRoleIds = assign.exists() ? (assign.data().roles || []) : [];
+      myPerms = new Set(assign.exists() ? (assign.data().perms || []) : []);
       myRoles = idsToRoles(myRoleIds);
     } catch (err) {
       console.error(err);
@@ -1322,10 +1472,14 @@
     consoleTab = t;
     $("ctab-roles").classList.toggle("active", t === "roles");
     $("ctab-members").classList.toggle("active", t === "members");
+    $("ctab-requests").classList.toggle("active", t === "requests");
     $("console-roles").hidden = t !== "roles";
     $("console-members").hidden = t !== "members";
+    $("console-requests").hidden = t !== "requests";
     say(consoleMsg, "");
-    if (t === "roles") loadRolesTab(); else loadMembersTab();
+    if (t === "roles") loadRolesTab();
+    else if (t === "members") loadMembersTab();
+    else loadRequestsTab();
   }
 
   // ---- Roles tab ----
@@ -1409,6 +1563,7 @@
       try {
         await setDoc(doc(db, "roles", role.id), data);
         rolesById[role.id] = { id: role.id, ...data };
+        await syncAllPerms();
         recomputeMyRoles();
         say(consoleMsg, "Saved \"" + name + "\".", true);
       } catch (err) {
@@ -1426,6 +1581,7 @@
         if (!window.confirm("Delete the role \"" + role.name + "\"? It will disappear for everyone who has it.")) return;
         try {
           await deleteDoc(doc(db, "roles", role.id));
+          await syncAllPerms();
           delete rolesById[role.id];
           renderRoles();
           recomputeMyRoles();
@@ -1543,7 +1699,7 @@
           if (cb.checked) set.add(r.id); else set.delete(r.id);
           const ids = [...set];
           try {
-            await setDoc(doc(db, "roleAssignments", u.uid), { roles: ids });
+            await setDoc(doc(db, "roleAssignments", u.uid), { roles: ids, perms: permsFor(ids) });
             memberCache.assign[u.uid] = ids;
             drawBadges();
             if (u.uid === auth.currentUser.uid) { myRoleIds = ids; recomputeMyRoles(); }
@@ -1581,6 +1737,340 @@
   document.addEventListener("keyup", e => {
     if (e.code === "ControlRight" && ctrlAlone) { ctrlAlone = false; toggleConsole(); }
   });
+
+  // =====================================================================
+  //  GUIDES: create / edit / delete from the website
+  // =====================================================================
+
+  function can(p) { return isOwner() || myPerms.has(p); }
+
+  let guidesSeeded = false;
+
+  function syncGuidePerms() {
+    window.guidePerms = {
+      create: guidesSeeded && can("create_guides"),
+      edit: guidesSeeded && can("edit_guides"),
+      del: guidesSeeded && can("delete_guides")
+    };
+    if (window.refreshGuideUI) window.refreshGuideUI();
+  }
+
+  async function loadGuides() {
+    try {
+      const meta = await getDoc(doc(db, "meta", "guides"));
+      if (!meta.exists()) { guidesSeeded = false; window.setGuides(null); return; }
+      const snap = await getDocs(collection(db, "guides"));
+      const guides = [];
+      snap.forEach(d => guides.push({ slug: d.id, ...d.data() }));
+      guides.sort((a, b) => (a.order || 0) - (b.order || 0));
+      guidesSeeded = true;
+      window.setGuides(guides);
+      syncGuidePerms();
+    } catch (err) {
+      console.error(err);   // keeps showing the built-in guides
+    }
+  }
+
+  // First owner sign-in: copy the built-in guides into the database
+  async function seedGuidesIfNeeded() {
+    const metaRef = doc(db, "meta", "guides");
+    if ((await getDoc(metaRef)).exists()) return;
+    const batch = writeBatch(db);
+    window.BUILTIN_GUIDES.forEach(g => {
+      batch.set(doc(db, "guides", g.slug), { name: g.name, photo: g.photo, sections: g.sections, order: g.order });
+    });
+    batch.set(metaRef, { seeded: true });
+    await batch.commit();
+    await loadGuides();
+  }
+
+  // ---- Permissions stored on each person so the database rules can check them ----
+  function permsFor(ids) {
+    const set = new Set();
+    (ids || []).forEach(id => {
+      const r = rolesById[id];
+      if (r && r.permissions) Object.keys(r.permissions).forEach(k => { if (r.permissions[k]) set.add(k); });
+    });
+    return [...set].sort();
+  }
+
+  async function syncAllPerms() {
+    const roles = await fetchRoles();
+    if (!Object.keys(roles).length) return;   // never strip roles if the list failed to load
+    rolesById = roles;
+    const snap = await getDocs(collection(db, "roleAssignments"));
+    let batch = writeBatch(db);
+    let count = 0;
+    for (const d of snap.docs) {
+      const data = d.data();
+      const ids = (data.roles || []).filter(id => rolesById[id]);
+      const perms = permsFor(ids);
+      const same = JSON.stringify(ids) === JSON.stringify(data.roles || [])
+        && JSON.stringify(perms) === JSON.stringify([...(data.perms || [])].sort());
+      if (same) continue;
+      batch.set(d.ref, { roles: ids, perms });
+      count++;
+      if (count % 400 === 0) { await batch.commit(); batch = writeBatch(db); }
+    }
+    if (count % 400 !== 0) await batch.commit();
+  }
+
+  // ---- Guide editor ----
+  const guideModal = $("guide-modal"), guideMsg = $("guide-msg");
+  let editingSlug = null;      // null means creating a new guide
+  let editorPhoto = "";
+  let sectionInputs = {};
+
+  function renderEditorPhoto() {
+    const box = $("guide-photo-preview");
+    const p = safePhoto(editorPhoto);
+    box.style.backgroundImage = p ? 'url("' + p + '")' : "none";
+    box.textContent = p ? "" : "No picture";
+    $("guide-photo-remove").hidden = !p;
+  }
+
+  window.openGuideEditor = function (slug) {
+    const g = slug ? window.getGuide(slug) : null;
+    if (g ? !can("edit_guides") : !can("create_guides")) return;
+    editingSlug = g ? g.slug : null;
+    editorPhoto = g ? (g.photo || "") : "";
+
+    $("guide-heading").textContent = g ? "Edit guide" : "New guide";
+    $("guide-name").value = g ? g.name : "";
+    renderEditorPhoto();
+
+    const box = $("guide-sections");
+    box.replaceChildren();
+    sectionInputs = {};
+    window.SECTIONS.forEach(title => {
+      const label = document.createElement("label");
+      label.append(title);
+      const ta = document.createElement("textarea");
+      ta.rows = 6;
+      ta.maxLength = 20000;
+      ta.value = g && g.sections ? (g.sections[title] || "") : "";
+      sectionInputs[title] = ta;
+      label.appendChild(ta);
+      box.appendChild(label);
+    });
+
+    const del = $("guide-delete");
+    del.hidden = !g || !(isOwner() || can("delete_guides"));
+    del.textContent = isOwner() ? "Delete guide" : "Request deletion";
+
+    say(guideMsg, "");
+    open(guideModal);
+  };
+
+  function closeGuideEditor() { close(guideModal); }
+  $("close-guide").addEventListener("click", closeGuideEditor);
+  document.addEventListener("keydown", e => { if (e.key === "Escape") closeGuideEditor(); });
+
+  // Resize a picture so it stays small enough to store (no file storage needed)
+  function resizeImageMax(file, maxW, maxH) {
+    return new Promise((resolve, reject) => {
+      const url = URL.createObjectURL(file);
+      const img = new Image();
+      img.onload = () => {
+        const scale = Math.min(1, maxW / img.width, maxH / img.height);
+        const w = Math.max(1, Math.round(img.width * scale));
+        const h = Math.max(1, Math.round(img.height * scale));
+        const canvas = document.createElement("canvas");
+        canvas.width = w;
+        canvas.height = h;
+        const ctx = canvas.getContext("2d");
+        ctx.fillStyle = "#ffffff";
+        ctx.fillRect(0, 0, w, h);
+        ctx.drawImage(img, 0, 0, w, h);
+        URL.revokeObjectURL(url);
+        let q = 0.8;
+        let out = canvas.toDataURL("image/jpeg", q);
+        while (out.length > 350000 && q > 0.3) { q -= 0.15; out = canvas.toDataURL("image/jpeg", q); }
+        resolve(out);
+      };
+      img.onerror = () => { URL.revokeObjectURL(url); reject(new Error("bad image")); };
+      img.src = url;
+    });
+  }
+
+  $("guide-photo-btn").addEventListener("click", () => $("guide-photo-input").click());
+  $("guide-photo-remove").addEventListener("click", () => { editorPhoto = ""; renderEditorPhoto(); });
+  $("guide-photo-input").addEventListener("change", async () => {
+    const input = $("guide-photo-input");
+    const file = input.files[0];
+    input.value = "";
+    if (!file) return;
+    if (!file.type.startsWith("image/")) return say(guideMsg, "Please choose an image file.");
+    if (file.size > 15 * 1024 * 1024) return say(guideMsg, "That image is too large (15 MB max).");
+    say(guideMsg, "");
+    try {
+      editorPhoto = await resizeImageMax(file, 800, 600);
+      renderEditorPhoto();
+    } catch (err) {
+      console.error(err);
+      say(guideMsg, "Couldn't use that image. Try a different one.");
+    }
+  });
+
+  async function uniqueSlug(name) {
+    const base = name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 55) || "guide";
+    let slug = base;
+    for (let i = 2; i < 30; i++) {
+      if (!(await getDoc(doc(db, "guides", slug))).exists()) return slug;
+      slug = base + "-" + i;
+    }
+    return base + "-" + Date.now();
+  }
+
+  $("guide-form").addEventListener("submit", async e => {
+    e.preventDefault();
+    const name = $("guide-name").value.trim();
+    if (!name) return say(guideMsg, "Give the guide a name.");
+
+    const sections = {};
+    window.SECTIONS.forEach(t => { sections[t] = sectionInputs[t].value.trim(); });
+
+    $("guide-save").disabled = true;
+    say(guideMsg, "");
+    try {
+      if (editingSlug) {
+        const g = window.getGuide(editingSlug);
+        await setDoc(doc(db, "guides", editingSlug), { name, photo: editorPhoto || "", sections, order: (g && g.order) || 0 });
+        await loadGuides();
+        closeGuideEditor();
+      } else {
+        const slug = await uniqueSlug(name);
+        await setDoc(doc(db, "guides", slug), { name, photo: editorPhoto || "", sections, order: Date.now() });
+        await loadGuides();
+        closeGuideEditor();
+        location.hash = "#/" + slug;
+      }
+    } catch (err) {
+      console.error(err);
+      say(guideMsg, err.code === "permission-denied"
+        ? "You don't have permission to do that. Ask the owner to check your role."
+        : "Couldn't save the guide. Please try again.");
+    } finally {
+      $("guide-save").disabled = false;
+    }
+  });
+
+  // Delete: the owner deletes directly; everyone else sends a request the owner must approve
+  $("guide-delete").addEventListener("click", async () => {
+    const g = editingSlug ? window.getGuide(editingSlug) : null;
+    if (!g) return;
+    say(guideMsg, "");
+    try {
+      if (isOwner()) {
+        if (!window.confirm("Delete the guide \"" + g.name + "\" for good?")) return;
+        const batch = writeBatch(db);
+        batch.delete(doc(db, "guides", g.slug));
+        batch.delete(doc(db, "guideDeleteRequests", g.slug));
+        await batch.commit();
+        await loadGuides();
+        closeGuideEditor();
+        location.hash = "#/";
+        refreshRequestCount();
+      } else {
+        if (!window.confirm("Ask the owner to delete \"" + g.name + "\"? It stays up until they approve.")) return;
+        await setDoc(doc(db, "guideDeleteRequests", g.slug), {
+          guideName: g.name,
+          requestedBy: auth.currentUser.uid,
+          requestedByName: profile ? profile.username : "",
+          requestedAt: Date.now()
+        });
+        say(guideMsg, "Deletion requested. The guide stays up until the owner approves it.", true);
+      }
+    } catch (err) {
+      console.error(err);
+      say(guideMsg, err.code === "permission-denied"
+        ? "Couldn't send that. A request for this guide may already be waiting."
+        : "Something went wrong. Please try again.");
+    }
+  });
+
+  // ---- Owner console: deletion requests ----
+  function setRequestCount(n) {
+    $("ctab-requests").textContent = n ? "Requests (" + n + ")" : "Requests";
+    $("open-console").textContent = n ? "Open console (" + n + " pending)" : "Open console";
+  }
+
+  async function refreshRequestCount() {
+    try { setRequestCount((await getDocs(collection(db, "guideDeleteRequests"))).size); }
+    catch (err) { console.error(err); }
+  }
+
+  async function loadRequestsTab() {
+    const box = $("requests-list");
+    box.textContent = "Loading...";
+    try {
+      const snap = await getDocs(collection(db, "guideDeleteRequests"));
+      setRequestCount(snap.size);
+      box.replaceChildren();
+      if (snap.empty) { box.textContent = "No pending requests."; return; }
+
+      snap.forEach(d => {
+        const r = d.data();
+        const card = document.createElement("div");
+        card.className = "member";
+        const text = document.createElement("p");
+        text.textContent = (r.requestedByName || "Someone") + " wants to delete the guide \"" + (r.guideName || d.id) + "\".";
+
+        const actions = document.createElement("div");
+        actions.className = "role-actions";
+        actions.style.marginTop = "12px";
+
+        const approve = document.createElement("button");
+        approve.type = "button";
+        approve.className = "pill-btn danger";
+        approve.textContent = "Approve and delete";
+        approve.addEventListener("click", async () => {
+          if (!window.confirm("Delete \"" + (r.guideName || d.id) + "\" for good?")) return;
+          try {
+            const batch = writeBatch(db);
+            batch.delete(doc(db, "guides", d.id));
+            batch.delete(doc(db, "guideDeleteRequests", d.id));
+            await batch.commit();
+            await loadGuides();
+            card.remove();
+            refreshRequestCount();
+            say(consoleMsg, "Guide deleted.", true);
+          } catch (err) {
+            console.error(err);
+            say(consoleMsg, "Couldn't delete that guide.");
+          }
+        });
+
+        const deny = document.createElement("button");
+        deny.type = "button";
+        deny.className = "pill-btn";
+        deny.textContent = "Deny";
+        deny.addEventListener("click", async () => {
+          try {
+            await deleteDoc(doc(db, "guideDeleteRequests", d.id));
+            card.remove();
+            refreshRequestCount();
+            say(consoleMsg, "Request denied.", true);
+          } catch (err) {
+            console.error(err);
+            say(consoleMsg, "Couldn't deny that request.");
+          }
+        });
+
+        actions.append(approve, deny);
+        card.append(text, actions);
+        box.appendChild(card);
+      });
+    } catch (err) {
+      console.error(err);
+      box.textContent = "";
+      say(consoleMsg, "Couldn't load requests. Check that your Firestore rules are published.");
+    }
+  }
+
+  $("ctab-requests").addEventListener("click", () => showTab("requests"));
+
+  loadGuides();
 
   finishEmailLink();
 </script>
