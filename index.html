@@ -281,6 +281,59 @@
   .avatar-actions { display: flex; flex-wrap: wrap; gap: 8px; }
   .settings-line { height: 1px; margin: 22px 0; background: var(--line); }
 
+  /* ---------- Roles + owner console ---------- */
+  .role-badge {
+    display: inline-block;
+    padding: 1px 9px;
+    font-family: var(--body);
+    font-size: 0.72rem;
+    font-weight: 600;
+    line-height: 1.6;
+    border: 1px solid;
+    border-radius: 999px;
+    white-space: nowrap;
+  }
+  .profile-btn .role-badge { font-size: 0.68rem; }
+  @media (max-width: 480px) { .profile-btn .role-badge { display: none; } }
+
+  .badge-row { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 18px; }
+  .badge-row:empty { display: none; }
+  #open-console { margin-bottom: 10px; }
+
+  .modal.console { max-width: 780px; }
+
+  .role-card, .member {
+    padding: 16px;
+    margin-bottom: 12px;
+    background: var(--bg);
+    border: 1px solid var(--line);
+    border-radius: 12px;
+  }
+  .role-top { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 14px; }
+  .role-top input[type="text"] { flex: 1; width: auto; min-width: 140px; margin: 0; padding: 8px 10px; }
+  .role-top input[type="color"] {
+    width: 40px; height: 36px; padding: 2px;
+    background: none; border: 1px solid var(--line); border-radius: 8px; cursor: pointer;
+  }
+  .perm-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(170px, 1fr));
+    gap: 4px 14px;
+    margin-bottom: 14px;
+  }
+  .modal .perm { display: flex; align-items: center; gap: 8px; margin: 0; font-size: 0.88rem; color: var(--text); }
+  .role-actions { display: flex; gap: 8px; }
+  .role-card .modal-sub { margin: 12px 0 0; }
+
+  #member-search { margin: 0 0 14px; }
+  .member-head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+  .member-head .uname { font-weight: 600; }
+  .member-head .badges { display: flex; flex-wrap: wrap; gap: 6px; flex: 1; }
+  .member-roles {
+    display: flex; flex-wrap: wrap; gap: 6px 18px;
+    margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--line);
+  }
+
   /* ---------- Home ---------- */
   .container {
     max-width: 760px;
@@ -495,6 +548,8 @@
         <input type="file" id="photo-input" accept="image/*" hidden>
       </div>
 
+      <div class="badge-row" id="settings-roles"></div>
+
       <form id="username-form" novalidate>
         <label>Username
           <input id="settings-username" type="text" autocomplete="off" maxlength="20">
@@ -505,7 +560,34 @@
       <p class="form-msg" id="settings-msg" role="alert"></p>
 
       <div class="settings-line"></div>
+      <button class="pill-btn submit" id="open-console" type="button" hidden>Open console</button>
       <button class="pill-btn danger submit" id="logout-btn" type="button">Log out</button>
+    </div>
+  </div>
+
+  <!-- OWNER CONSOLE (Right Ctrl) -->
+  <div class="modal-overlay" id="console-modal" role="dialog" aria-modal="true" aria-labelledby="console-heading">
+    <div class="modal console">
+      <button class="modal-close" id="close-console" type="button" aria-label="Close">&times;</button>
+      <h2 id="console-heading">Console</h2>
+
+      <div class="tabs">
+        <button type="button" id="ctab-roles" class="active">Roles</button>
+        <button type="button" id="ctab-members">Members</button>
+      </div>
+
+      <section id="console-roles">
+        <p class="modal-sub">Create roles, rename them, and pick a color. Permissions are saved but don't do anything yet.</p>
+        <div id="roles-list"></div>
+        <button class="pill-btn primary" id="add-role" type="button">+ Create role</button>
+      </section>
+
+      <section id="console-members" hidden>
+        <input type="text" id="member-search" placeholder="Search usernames" autocomplete="off">
+        <div id="members-list"></div>
+      </section>
+
+      <p class="form-msg" id="console-msg" role="alert"></p>
     </div>
   </div>
 
@@ -683,7 +765,8 @@
     EmailAuthProvider, linkWithCredential, updatePassword, deleteUser, signOut
   } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
   import {
-    getFirestore, doc, getDoc, updateDoc, writeBatch, runTransaction
+    getFirestore, doc, getDoc, getDocs, setDoc, deleteDoc, updateDoc, writeBatch,
+    runTransaction, collection, query, limit
   } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
   /* =====================================================================
@@ -696,6 +779,13 @@
     appId: "1:213598651104:web:699e753c5c816273000685"
   };
   /* ===================== END OF FIREBASE SETTINGS ===================== */
+
+  /*
+    YOUR OWNER ACCOUNT
+    Paste your User UID here (Firebase console > Authentication > Users > "User UID").
+    This account gets the Owner role and can open the console with Right Ctrl.
+  */
+  const OWNER_UID = "PASTE_YOUR_USER_UID";
 
   /*
     HOW LOGINS WORK (so nobody's real email is ever stored):
@@ -736,6 +826,9 @@
   let currentUser = null;
   let profile = null;        // { username, photo? } or null if not created yet
   let authRun = 0;
+  let myRoleIds = [];
+  let myRoles = [];
+  let rolesById = {};
   let settingUp = false;     // true while the "create username + password" step is saving
   let verifiedSignup = false; // true after an email link was verified, before the account exists
   try { verifiedSignup = sessionStorage.getItem(VERIFIED_KEY) === "1"; } catch (_) {}
@@ -791,7 +884,7 @@
       const name = document.createElement("span");
       name.className = "name";
       name.textContent = profile.username;
-      btn.append(makeAvatar(false), name);
+      btn.append(makeAvatar(false), name, ...myRoles.map(makeBadge));
       btn.addEventListener("click", openSettings);
       authArea.appendChild(btn);
     } else if (!currentUser && !verifiedSignup) {
@@ -980,6 +1073,8 @@
     $("settings-avatar").replaceChildren(makeAvatar(true));
     $("settings-username").value = profile.username;
     $("remove-photo").hidden = !profile.photo;
+    $("settings-roles").replaceChildren(...myRoles.map(makeBadge));
+    $("open-console").hidden = !isOwner();
   }
   function openSettings() {
     if (!profile) return;
@@ -1100,6 +1195,8 @@
     const run = ++authRun;
     currentUser = user;
     profile = null;
+    myRoles = [];
+    myRoleIds = [];
     let loadFailed = false;
 
     if (user) {
@@ -1111,6 +1208,10 @@
         loadFailed = true;
       }
       if (run !== authRun) return;
+      if (profile) {
+        await loadMyRoles(user);
+        if (run !== authRun) return;
+      }
     }
 
     renderAuthArea();
@@ -1125,6 +1226,360 @@
     } else {
       showSetup(loadFailed ? "Couldn't load your profile. Make sure Firestore is set up in Firebase." : "");
     }
+  });
+
+  // =====================================================================
+  //  ROLES + OWNER CONSOLE  (press Right Ctrl, owner only)
+  // =====================================================================
+
+  /*
+    Permissions a role can have. They are saved on the role but don't do anything yet.
+    To add one later, add a line here: { key: "some_key", label: "Name shown in the console" }
+  */
+  const PERMISSIONS = [
+    { key: "delete_posts", label: "Delete posts" },
+    { key: "pin_posts",    label: "Pin posts" },
+    { key: "edit_guides",  label: "Edit guides" },
+    { key: "mute_users",   label: "Mute users" },
+    { key: "ban_users",    label: "Ban users" },
+    { key: "view_reports", label: "View reports" }
+  ];
+
+  const isOwner = () => !!auth.currentUser && auth.currentUser.uid === OWNER_UID;
+  const byOrder = (a, b) => (a.order || 0) - (b.order || 0);
+  const idsToRoles = ids => (ids || []).map(id => rolesById[id]).filter(Boolean).sort(byOrder);
+
+  function makeBadge(role) {
+    const b = document.createElement("span");
+    b.className = "role-badge";
+    b.textContent = role.name;
+    b.style.color = role.color;
+    b.style.borderColor = role.color;
+    b.style.background = role.color + "22";
+    return b;
+  }
+
+  async function fetchRoles() {
+    const snap = await getDocs(collection(db, "roles"));
+    const map = {};
+    snap.forEach(d => { map[d.id] = { id: d.id, ...d.data() }; });
+    return map;
+  }
+
+  // The owner always has the Owner role (created automatically the first time).
+  async function ensureOwner(user) {
+    const roleRef = doc(db, "roles", "owner");
+    if (!(await getDoc(roleRef)).exists()) {
+      await setDoc(roleRef, { name: "Owner", color: "#f5c542", permissions: {}, order: 0, builtin: true });
+    }
+    const aRef = doc(db, "roleAssignments", user.uid);
+    const a = await getDoc(aRef);
+    const ids = a.exists() ? (a.data().roles || []) : [];
+    if (!ids.includes("owner")) await setDoc(aRef, { roles: ["owner", ...ids] });
+  }
+
+  async function loadMyRoles(user) {
+    myRoles = [];
+    myRoleIds = [];
+    try {
+      if (user.uid === OWNER_UID) await ensureOwner(user);
+      const [roles, assign] = await Promise.all([
+        fetchRoles(),
+        getDoc(doc(db, "roleAssignments", user.uid))
+      ]);
+      rolesById = roles;
+      myRoleIds = assign.exists() ? (assign.data().roles || []) : [];
+      myRoles = idsToRoles(myRoleIds);
+    } catch (err) {
+      console.error(err);
+    }
+  }
+
+  function recomputeMyRoles() {
+    myRoles = idsToRoles(myRoleIds);
+    renderAuthArea();
+    if (settingsModal.classList.contains("open") && profile) renderSettings();
+  }
+
+  // ---- Console open / close ----
+  const consoleModal = $("console-modal"), consoleMsg = $("console-msg");
+  let consoleTab = "roles";
+  let memberCache = null;
+
+  function openConsole() {
+    if (!isOwner()) return;
+    close(settingsModal);
+    say(consoleMsg, "");
+    open(consoleModal);
+    showTab(consoleTab);
+  }
+  function closeConsole() { close(consoleModal); }
+  function toggleConsole() {
+    if (consoleModal.classList.contains("open")) closeConsole(); else openConsole();
+  }
+
+  function showTab(t) {
+    consoleTab = t;
+    $("ctab-roles").classList.toggle("active", t === "roles");
+    $("ctab-members").classList.toggle("active", t === "members");
+    $("console-roles").hidden = t !== "roles";
+    $("console-members").hidden = t !== "members";
+    say(consoleMsg, "");
+    if (t === "roles") loadRolesTab(); else loadMembersTab();
+  }
+
+  // ---- Roles tab ----
+  async function loadRolesTab() {
+    $("roles-list").textContent = "Loading...";
+    try {
+      rolesById = await fetchRoles();
+      renderRoles();
+    } catch (err) {
+      console.error(err);
+      $("roles-list").textContent = "";
+      say(consoleMsg, "Couldn't load roles. Check that your Firestore rules are published.");
+    }
+  }
+
+  function renderRoles() {
+    const list = $("roles-list");
+    list.replaceChildren();
+    const roles = Object.values(rolesById).sort(byOrder);
+    if (!roles.length) list.textContent = "No roles yet.";
+    roles.forEach(role => list.appendChild(roleCard(role)));
+  }
+
+  function roleCard(role) {
+    const isOwnerRole = role.id === "owner";
+    const card = document.createElement("div");
+    card.className = "role-card";
+
+    const top = document.createElement("div");
+    top.className = "role-top";
+    const preview = makeBadge(role);
+    const nameIn = document.createElement("input");
+    nameIn.type = "text";
+    nameIn.maxLength = 24;
+    nameIn.value = role.name;
+    nameIn.setAttribute("aria-label", "Role name");
+    const colorIn = document.createElement("input");
+    colorIn.type = "color";
+    colorIn.value = role.color;
+    colorIn.setAttribute("aria-label", "Role color");
+    top.append(preview, nameIn, colorIn);
+
+    const updatePreview = () => {
+      preview.textContent = nameIn.value.trim() || "Role";
+      preview.style.color = colorIn.value;
+      preview.style.borderColor = colorIn.value;
+      preview.style.background = colorIn.value + "22";
+    };
+    nameIn.addEventListener("input", updatePreview);
+    colorIn.addEventListener("input", updatePreview);
+
+    const perms = document.createElement("div");
+    perms.className = "perm-grid";
+    const checks = {};
+    PERMISSIONS.forEach(p => {
+      const label = document.createElement("label");
+      label.className = "perm";
+      const cb = document.createElement("input");
+      cb.type = "checkbox";
+      cb.checked = isOwnerRole || !!(role.permissions && role.permissions[p.key]);
+      cb.disabled = isOwnerRole;
+      checks[p.key] = cb;
+      label.append(cb, p.label);
+      perms.appendChild(label);
+    });
+
+    const actions = document.createElement("div");
+    actions.className = "role-actions";
+    const save = document.createElement("button");
+    save.type = "button";
+    save.className = "pill-btn primary";
+    save.textContent = "Save";
+    actions.appendChild(save);
+
+    save.addEventListener("click", async () => {
+      const name = nameIn.value.trim();
+      if (!name) return say(consoleMsg, "Give the role a name.");
+      const permissions = {};
+      if (!isOwnerRole) PERMISSIONS.forEach(p => { if (checks[p.key].checked) permissions[p.key] = true; });
+      const data = { name, color: colorIn.value, permissions, order: role.order || 0, builtin: !!role.builtin };
+      try {
+        await setDoc(doc(db, "roles", role.id), data);
+        rolesById[role.id] = { id: role.id, ...data };
+        recomputeMyRoles();
+        say(consoleMsg, "Saved \"" + name + "\".", true);
+      } catch (err) {
+        console.error(err);
+        say(consoleMsg, "Couldn't save. Check that your Firestore rules are published.");
+      }
+    });
+
+    if (!isOwnerRole) {
+      const del = document.createElement("button");
+      del.type = "button";
+      del.className = "pill-btn danger";
+      del.textContent = "Delete";
+      del.addEventListener("click", async () => {
+        if (!window.confirm("Delete the role \"" + role.name + "\"? It will disappear for everyone who has it.")) return;
+        try {
+          await deleteDoc(doc(db, "roles", role.id));
+          delete rolesById[role.id];
+          renderRoles();
+          recomputeMyRoles();
+          say(consoleMsg, "Role deleted.", true);
+        } catch (err) {
+          console.error(err);
+          say(consoleMsg, "Couldn't delete that role.");
+        }
+      });
+      actions.appendChild(del);
+    }
+
+    card.append(top, perms, actions);
+    if (isOwnerRole) {
+      const note = document.createElement("p");
+      note.className = "modal-sub";
+      note.textContent = "The Owner role has every permission and can't be deleted or given to anyone else.";
+      card.appendChild(note);
+    }
+    return card;
+  }
+
+  $("add-role").addEventListener("click", async () => {
+    const ref = doc(collection(db, "roles"));
+    const data = { name: "New role", color: "#7c9cff", permissions: {}, order: Date.now(), builtin: false };
+    try {
+      await setDoc(ref, data);
+      rolesById[ref.id] = { id: ref.id, ...data };
+      renderRoles();
+      say(consoleMsg, "Role created. Rename it and pick a color.", true);
+    } catch (err) {
+      console.error(err);
+      say(consoleMsg, "Couldn't create the role. Check that your Firestore rules are published.");
+    }
+  });
+
+  // ---- Members tab ----
+  function avatarFor(data) {
+    const span = document.createElement("span");
+    span.className = "avatar";
+    if (data.photo && data.photo.startsWith("data:image/")) {
+      const img = document.createElement("img");
+      img.alt = "";
+      img.src = data.photo;
+      span.appendChild(img);
+    } else {
+      span.textContent = (data.username || "?").charAt(0).toUpperCase();
+    }
+    return span;
+  }
+
+  async function loadMembersTab() {
+    $("members-list").textContent = "Loading...";
+    try {
+      const [roles, usersSnap, assignSnap] = await Promise.all([
+        fetchRoles(),
+        getDocs(query(collection(db, "users"), limit(200))),
+        getDocs(collection(db, "roleAssignments"))
+      ]);
+      rolesById = roles;
+      const assign = {};
+      assignSnap.forEach(d => { assign[d.id] = d.data().roles || []; });
+      const users = [];
+      usersSnap.forEach(d => users.push({ uid: d.id, ...d.data() }));
+      users.sort((a, b) => (a.username || "").toLowerCase().localeCompare((b.username || "").toLowerCase()));
+      memberCache = { users, assign };
+      renderMembers();
+    } catch (err) {
+      console.error(err);
+      $("members-list").textContent = "";
+      say(consoleMsg, "Couldn't load members. Check that your Firestore rules are published.");
+    }
+  }
+
+  function renderMembers() {
+    const list = $("members-list");
+    list.replaceChildren();
+    const q = $("member-search").value.trim().toLowerCase();
+    const assignable = Object.values(rolesById).filter(r => r.id !== "owner").sort(byOrder);
+    const users = memberCache.users.filter(u => !q || (u.username || "").toLowerCase().includes(q));
+    if (!users.length) { list.textContent = "No members found."; return; }
+
+    users.forEach(u => {
+      const row = document.createElement("div");
+      row.className = "member";
+
+      const head = document.createElement("div");
+      head.className = "member-head";
+      const name = document.createElement("span");
+      name.className = "uname";
+      name.textContent = u.username || "(no username)";
+      const badges = document.createElement("span");
+      badges.className = "badges";
+      const drawBadges = () => badges.replaceChildren(...idsToRoles(memberCache.assign[u.uid]).map(makeBadge));
+      drawBadges();
+      const toggle = document.createElement("button");
+      toggle.type = "button";
+      toggle.className = "pill-btn";
+      toggle.textContent = "Roles";
+      head.append(avatarFor(u), name, badges, toggle);
+
+      const panel = document.createElement("div");
+      panel.className = "member-roles";
+      panel.hidden = true;
+      if (!assignable.length) panel.textContent = "No roles to give yet. Create one in the Roles tab.";
+      assignable.forEach(r => {
+        const label = document.createElement("label");
+        label.className = "perm";
+        const cb = document.createElement("input");
+        cb.type = "checkbox";
+        cb.checked = (memberCache.assign[u.uid] || []).includes(r.id);
+        label.append(cb, makeBadge(r));
+        cb.addEventListener("change", async () => {
+          const set = new Set(memberCache.assign[u.uid] || []);
+          if (cb.checked) set.add(r.id); else set.delete(r.id);
+          const ids = [...set];
+          try {
+            await setDoc(doc(db, "roleAssignments", u.uid), { roles: ids });
+            memberCache.assign[u.uid] = ids;
+            drawBadges();
+            if (u.uid === auth.currentUser.uid) { myRoleIds = ids; recomputeMyRoles(); }
+            say(consoleMsg, "Updated " + (u.username || "member") + ".", true);
+          } catch (err) {
+            console.error(err);
+            cb.checked = !cb.checked;
+            say(consoleMsg, "Couldn't update that member.");
+          }
+        });
+        panel.appendChild(label);
+      });
+      toggle.addEventListener("click", () => { panel.hidden = !panel.hidden; });
+
+      row.append(head, panel);
+      list.appendChild(row);
+    });
+  }
+
+  // ---- Wiring ----
+  $("close-console").addEventListener("click", closeConsole);
+  consoleModal.addEventListener("click", e => { if (e.target === consoleModal) closeConsole(); });
+  $("ctab-roles").addEventListener("click", () => showTab("roles"));
+  $("ctab-members").addEventListener("click", () => showTab("members"));
+  $("member-search").addEventListener("input", () => { if (memberCache) renderMembers(); });
+  $("open-console").addEventListener("click", openConsole);
+  document.addEventListener("keydown", e => { if (e.key === "Escape") closeConsole(); });
+
+  // Right Ctrl on its own (not as part of a shortcut) toggles the console
+  let ctrlAlone = false;
+  document.addEventListener("keydown", e => {
+    if (e.code === "ControlRight") { if (!e.repeat) ctrlAlone = true; }
+    else ctrlAlone = false;
+  });
+  document.addEventListener("keyup", e => {
+    if (e.code === "ControlRight" && ctrlAlone) { ctrlAlone = false; toggleConsole(); }
   });
 
   finishEmailLink();
