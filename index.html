@@ -487,6 +487,24 @@
     list-style: none;
   }
 
+  /* Stable placeholders keep the home page from swapping built-in guides
+     for database guides after the first paint. */
+  .guide-skeleton {
+    min-height: 120px;
+    border: 1px solid var(--line);
+    border-radius: 14px;
+    background: linear-gradient(100deg, var(--surface) 20%, rgba(255,255,255,.055) 38%, var(--surface) 58%);
+    background-size: 220% 100%;
+    animation: guide-shimmer 1.35s ease-in-out infinite;
+  }
+  @keyframes guide-shimmer {
+    from { background-position: 100% 0; }
+    to { background-position: -120% 0; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .guide-skeleton { animation: none; }
+  }
+
   .species-btn {
     position: relative;
     display: flex;
@@ -1000,7 +1018,10 @@
   const BUILTIN_GUIDES = SPECIES.map((s, i) => ({
     slug: s.slug, name: s.name, photo: s.image, sections: CONTENT[s.slug] || {}, order: i + 1
   }));
-  let GUIDES = BUILTIN_GUIDES;
+  // Wait for Firestore before showing the guide list, so built-in and
+  // database-created guides never flash in as two different lists.
+  let GUIDES = [];
+  let guidesLoaded = false;
   window.BUILTIN_GUIDES = BUILTIN_GUIDES;
   window.SECTIONS = SECTIONS;
   window.guidePerms = { create: false, edit: false, del: false };
@@ -1016,6 +1037,16 @@
   // Build the buttons on the home page
   function renderHome() {
     list.replaceChildren();
+
+    if (!guidesLoaded) {
+      for (let i = 0; i < 5; i++) {
+        const placeholder = document.createElement("li");
+        placeholder.className = "guide-skeleton";
+        placeholder.setAttribute("aria-hidden", "true");
+        list.appendChild(placeholder);
+      }
+      return;
+    }
 
     GUIDES.forEach(g => {
       const li = document.createElement("li");
@@ -1110,7 +1141,12 @@
   }
 
   // Called by the account script when guides load or permissions change
-  window.setGuides = guides => { GUIDES = guides || BUILTIN_GUIDES; renderHome(); route(true); };
+  window.setGuides = guides => {
+    GUIDES = guides || BUILTIN_GUIDES;
+    guidesLoaded = true;
+    renderHome();
+    route(true);
+  };
   window.refreshGuideUI = () => { renderHome(); route(true); };
 
   window.addEventListener("hashchange", () => route());
@@ -1998,7 +2034,9 @@
       window.setGuides(guides);
       syncGuidePerms();
     } catch (err) {
-      console.error(err);   // keeps showing the built-in guides
+      console.error("Could not load guides from Firestore; showing built-in guides.", err);
+      // Resolve the loading state even if Firestore is unavailable.
+      window.setGuides(null);
     }
   }
 
