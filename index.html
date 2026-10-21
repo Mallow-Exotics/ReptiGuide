@@ -396,7 +396,8 @@
     transition: color .2s;
   }
   .nav-link:hover { color: var(--accent); }
-  body.on-community .nav-link { display: none; }
+  /* Keep the nav slot in the topbar so the profile never shifts between pages. */
+  body.on-community .nav-link { visibility: hidden; pointer-events: none; }
 
   .community-hero h1 { font-size: clamp(2.4rem, 7vw, 3.6rem); }
   .community-hero p { max-width: 52ch; }
@@ -710,18 +711,15 @@
     transition-duration: var(--ui-fast);
     transition-timing-function: var(--ui-ease);
   }
-  .profile-btn, .new-guide-btn, .pill-btn, .post-actions button { transform: translateZ(0); }
+  .profile-btn, .new-guide-btn, .pill-btn, .post-actions button { transform: none; }
   .profile-btn:active, .new-guide-btn:active, .pill-btn:active, .post-actions button:active {
     transform: scale(.975);
   }
+  /* One entrance animation only: avoid stacking animations on already animated elements. */
   #auth-area:not(.pending) > * { animation: ui-pop-in 300ms var(--ui-ease) both; }
   .species-btn, .post-card, .role-card, .guide-section, .empty-note {
     animation: ui-rise-in 360ms var(--ui-ease) both;
   }
-  #feed > :nth-child(2), #home .species-list > :nth-child(2) { animation-delay: 35ms; }
-  #feed > :nth-child(3), #home .species-list > :nth-child(3) { animation-delay: 70ms; }
-  #feed > :nth-child(4), #home .species-list > :nth-child(4) { animation-delay: 105ms; }
-  #feed > :nth-child(5), #home .species-list > :nth-child(5) { animation-delay: 140ms; }
   @keyframes ui-rise-in {
     from { opacity: 0; transform: translateY(9px); }
     to { opacity: 1; transform: translateY(0); }
@@ -732,7 +730,7 @@
   }
   @media (prefers-reduced-motion: reduce) {
     .modal-overlay, .modal-overlay .modal { transition-duration: 1ms !important; }
-    #auth-area:not(.pending) > *, .species-btn, .post-card, .role-card, .guide-section, .empty-note { animation-duration: 1ms !important; }
+    #auth-area:not(.pending) > *, .species-btn, .post-card, .role-card, .guide-section, .empty-note { animation: none !important; }
   }
 
 </style>
