@@ -72,15 +72,15 @@
   body.on-species .back { display: inline-flex; }
 
   /* ---------- Account area (top right) ---------- */
+  [hidden] { display: none !important; }
+
   .auth-area {
     margin-left: auto;
     display: flex;
     align-items: center;
     gap: 12px;
-    font-size: 0.9rem;
   }
-  .auth-area .who { color: var(--muted); }
-  .auth-area .who strong { color: var(--text); font-weight: 600; }
+  .auth-area.pending { visibility: hidden; }
 
   .pill-btn {
     font-family: var(--body);
@@ -97,8 +97,50 @@
   .pill-btn:hover { color: var(--accent); border-color: var(--accent); }
   .pill-btn.primary { background: var(--accent); border-color: var(--accent); color: #0d1511; }
   .pill-btn.primary:hover { background: #cdf060; color: #0d1511; }
+  .pill-btn.danger:hover { color: var(--danger); border-color: var(--danger); }
+  .pill-btn:disabled { opacity: .6; cursor: default; }
 
-  /* ---------- Account modal ---------- */
+  .profile-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    padding: 4px 14px 4px 4px;
+    font-family: var(--body);
+    font-size: 0.9rem;
+    font-weight: 500;
+    color: var(--text);
+    background: transparent;
+    border: 1px solid var(--line);
+    border-radius: 999px;
+    cursor: pointer;
+    transition: color .2s, border-color .2s;
+  }
+  .profile-btn:hover { color: var(--accent); border-color: var(--accent); }
+  .profile-btn .name { max-width: 140px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  @media (max-width: 480px) {
+    .profile-btn { padding: 4px; }
+    .profile-btn .name { display: none; }
+  }
+
+  .avatar {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex: none;
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    overflow: hidden;
+    background: var(--accent);
+    color: #0d1511;
+    font-family: var(--display);
+    font-weight: 700;
+    font-size: 1rem;
+  }
+  .avatar img { display: block; width: 100%; height: 100%; object-fit: cover; }
+  .avatar.large { width: 84px; height: 84px; font-size: 2.2rem; }
+
+  /* ---------- Popups ---------- */
   .modal-overlay {
     position: fixed;
     inset: 0;
@@ -117,6 +159,8 @@
     position: relative;
     width: 100%;
     max-width: 400px;
+    max-height: calc(100vh - 40px);
+    overflow-y: auto;
     padding: 32px 28px 28px;
     background: var(--surface);
     border: 1px solid var(--line);
@@ -141,6 +185,7 @@
     font-size: 1.7rem;
     margin-bottom: 20px;
   }
+  .modal-sub { margin: -8px 0 18px; font-size: 0.92rem; color: var(--muted); }
 
   .tabs {
     display: flex;
@@ -199,7 +244,7 @@
     font-size: 0.85rem;
     color: var(--muted);
   }
-  .modal input {
+  .modal input[type="text"], .modal input[type="password"], .modal input[type="email"] {
     display: block;
     width: 100%;
     margin-top: 6px;
@@ -216,6 +261,25 @@
   .modal .submit { width: 100%; padding: 11px; margin-top: 4px; }
 
   .form-msg { min-height: 1.3em; margin-top: 14px; font-size: 0.88rem; color: var(--danger); }
+  .form-msg.ok { color: var(--accent); }
+
+  .link-btn {
+    display: block;
+    width: 100%;
+    margin-top: 12px;
+    padding: 6px;
+    font-family: var(--body);
+    font-size: 0.88rem;
+    color: var(--muted);
+    background: none;
+    border: none;
+    cursor: pointer;
+  }
+  .link-btn:hover { color: var(--text); }
+
+  .settings-avatar { display: flex; align-items: center; gap: 18px; margin-bottom: 24px; }
+  .avatar-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+  .settings-line { height: 1px; margin: 22px 0; background: var(--line); }
 
   /* ---------- Home ---------- */
   .container {
@@ -350,16 +414,14 @@
     <a class="back" href="#/" aria-label="Back to home">&larr; Back</a>
     <a class="topbar-title" id="topbar-title" href="#/">ReptiGuide</a>
 
-    <div class="auth-area" id="auth-area">
-      <button class="pill-btn primary" id="open-auth" type="button">Sign in</button>
-    </div>
+    <div class="auth-area pending" id="auth-area"></div>
   </header>
 
-  <!-- ACCOUNT POPUP -->
+  <!-- LOG IN / CREATE ACCOUNT POPUP -->
   <div class="modal-overlay" id="auth-modal" role="dialog" aria-modal="true" aria-labelledby="auth-heading">
     <div class="modal">
       <button class="modal-close" id="close-auth" type="button" aria-label="Close">&times;</button>
-      <h2 id="auth-heading">Welcome</h2>
+      <h2 id="auth-heading">Welcome back</h2>
 
       <div class="tabs">
         <button type="button" id="tab-login" class="active">Log in</button>
@@ -371,19 +433,79 @@
         Continue with Google
       </button>
 
-      <div class="divider">or use a username</div>
+      <div class="divider" id="auth-divider">or use your username</div>
 
-      <form id="auth-form" novalidate>
+      <form id="login-form" novalidate>
         <label>Username
-          <input id="auth-username" type="text" autocomplete="username" maxlength="20" required>
+          <input id="login-username" type="text" autocomplete="username" maxlength="20">
         </label>
         <label>Password
-          <input id="auth-password" type="password" autocomplete="current-password" required>
+          <input id="login-password" type="password" autocomplete="current-password">
         </label>
-        <button class="pill-btn primary submit" id="auth-submit" type="submit">Log in</button>
+        <button class="pill-btn primary submit" id="login-submit" type="submit">Log in</button>
+      </form>
+
+      <form id="signup-form" novalidate hidden>
+        <label>Email
+          <input id="signup-email" type="email" autocomplete="email">
+        </label>
+        <button class="pill-btn primary submit" id="signup-submit" type="submit">Send verification link</button>
       </form>
 
       <p class="form-msg" id="auth-msg" role="alert"></p>
+    </div>
+  </div>
+
+  <!-- CREATE USERNAME + PASSWORD POPUP (shown after Google / email verification) -->
+  <div class="modal-overlay" id="setup-modal" role="dialog" aria-modal="true" aria-labelledby="setup-heading">
+    <div class="modal">
+      <h2 id="setup-heading">Create your profile</h2>
+      <p class="modal-sub" id="setup-sub">Choose a username and password for ReptiGuide.</p>
+
+      <form id="setup-form" novalidate>
+        <label>Username
+          <input id="setup-username" type="text" autocomplete="username" maxlength="20">
+        </label>
+        <label>Password
+          <input id="setup-password" type="password" autocomplete="new-password">
+        </label>
+        <label>Confirm password
+          <input id="setup-password2" type="password" autocomplete="new-password">
+        </label>
+        <button class="pill-btn primary submit" id="setup-submit" type="submit">Create account</button>
+      </form>
+
+      <button class="link-btn" id="setup-cancel" type="button">Cancel and sign out</button>
+      <p class="form-msg" id="setup-msg" role="alert"></p>
+    </div>
+  </div>
+
+  <!-- SETTINGS POPUP -->
+  <div class="modal-overlay" id="settings-modal" role="dialog" aria-modal="true" aria-labelledby="settings-heading">
+    <div class="modal">
+      <button class="modal-close" id="close-settings" type="button" aria-label="Close">&times;</button>
+      <h2 id="settings-heading">Settings</h2>
+
+      <div class="settings-avatar">
+        <div id="settings-avatar"></div>
+        <div class="avatar-actions">
+          <button class="pill-btn" id="change-photo" type="button">Change picture</button>
+          <button class="pill-btn" id="remove-photo" type="button">Remove</button>
+        </div>
+        <input type="file" id="photo-input" accept="image/*" hidden>
+      </div>
+
+      <form id="username-form" novalidate>
+        <label>Username
+          <input id="settings-username" type="text" autocomplete="off" maxlength="20">
+        </label>
+        <button class="pill-btn primary submit" id="username-save" type="submit">Save username</button>
+      </form>
+
+      <p class="form-msg" id="settings-msg" role="alert"></p>
+
+      <div class="settings-line"></div>
+      <button class="pill-btn danger submit" id="logout-btn" type="button">Log out</button>
     </div>
   </div>
 
@@ -556,139 +678,457 @@
   import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
   import {
     getAuth, onAuthStateChanged, signInWithPopup, GoogleAuthProvider,
-    createUserWithEmailAndPassword, signInWithEmailAndPassword,
-    updateProfile, signOut
+    sendSignInLinkToEmail, isSignInWithEmailLink, signInWithEmailLink,
+    signInWithEmailAndPassword, createUserWithEmailAndPassword,
+    EmailAuthProvider, linkWithCredential, updatePassword, deleteUser, signOut
   } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+  import {
+    getFirestore, doc, getDoc, updateDoc, writeBatch, runTransaction
+  } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
   /* =====================================================================
-     PASTE YOUR FIREBASE SETTINGS HERE
-     (Firebase console > Project settings > Your apps > Web app > Config)
+     YOUR FIREBASE SETTINGS
      ===================================================================== */
-const firebaseConfig = {
-  apiKey: "AIzaSyBtG1vHRnV_zrIEi6KeZjSsbqvIESYOhn0",
-  authDomain: "reptiguide.firebaseapp.com",
-  projectId: "reptiguide",
-  appId: "1:213598651104:web:699e753c5c816273000685"
-};
+  const firebaseConfig = {
+    apiKey: "AIzaSyBtG1vHRnV_zrIEi6KeZjSsbqvIESYOhn0",
+    authDomain: "reptiguide.firebaseapp.com",
+    projectId: "reptiguide",
+    appId: "1:213598651104:web:699e753c5c816273000685"
+  };
   /* ===================== END OF FIREBASE SETTINGS ===================== */
 
-  const configured = !firebaseConfig.apiKey.startsWith("PASTE");
-  const auth = configured ? getAuth(initializeApp(firebaseConfig)) : null;
+  /*
+    HOW LOGINS WORK (so nobody's real email is ever stored):
+    - Your real email, or Google, is only used once to prove you're a real person.
+    - Your ReptiGuide login is a made-up address (like u1a2b3c...@users.reptiguide.app)
+      that only exists inside Firebase. The public username list only holds that
+      made-up address, never a real email.
+  */
 
-  // --- Elements ---
+  const app = initializeApp(firebaseConfig);
+  const auth = getAuth(app);
+  const db = getFirestore(app);
+  // A second, throwaway connection used only to verify email links.
+  // The temporary account it creates is deleted right after verification.
+  const verifyAuth = getAuth(initializeApp(firebaseConfig, "email-verify"));
+
   const $ = id => document.getElementById(id);
-  const modal = $("auth-modal"), authArea = $("auth-area"), msg = $("auth-msg");
-  const form = $("auth-form"), userIn = $("auth-username"), passIn = $("auth-password");
-  const submitBtn = $("auth-submit");
-  let mode = "login"; // or "signup"
+  const USERNAME_RE = /^[A-Za-z0-9_]{3,20}$/;
+  const ALIAS_DOMAIN = "users.reptiguide.app";
+  const EMAIL_KEY = "reptiguideEmailForSignIn";
+  const VERIFIED_KEY = "reptiguideEmailVerified";
 
-  // Usernames become a hidden email address so Firebase can store them.
-  const toEmail = u => u.toLowerCase() + "@users.reptiguide.app";
+  const authArea = $("auth-area");
+  const authModal = $("auth-modal"), setupModal = $("setup-modal"), settingsModal = $("settings-modal");
+  const authMsg = $("auth-msg"), setupMsg = $("setup-msg"), settingsMsg = $("settings-msg");
 
-  function showMsg(text) { msg.textContent = text || ""; }
+  const open = el => el.classList.add("open");
+  const close = el => el.classList.remove("open");
+  function say(el, text, ok) { el.textContent = text || ""; el.classList.toggle("ok", !!ok); }
 
-  function setMode(m) {
-    mode = m;
-    $("tab-login").classList.toggle("active", m === "login");
-    $("tab-signup").classList.toggle("active", m === "signup");
-    submitBtn.textContent = m === "login" ? "Log in" : "Create account";
-    $("auth-heading").textContent = m === "login" ? "Welcome back" : "Join ReptiGuide";
-    passIn.autocomplete = m === "login" ? "current-password" : "new-password";
-    showMsg(configured ? "" : "Accounts aren't set up yet. Add your Firebase settings in index.html.");
+  function newAlias() {
+    const bytes = new Uint8Array(8);
+    crypto.getRandomValues(bytes);
+    return "u" + Array.from(bytes, b => b.toString(16).padStart(2, "0")).join("") + "@" + ALIAS_DOMAIN;
   }
 
-  function openModal(m) { setMode(m || "login"); modal.classList.add("open"); userIn.focus(); }
-  function closeModal() { modal.classList.remove("open"); form.reset(); showMsg(""); }
+  // ---- State ----
+  let currentUser = null;
+  let profile = null;        // { username, photo? } or null if not created yet
+  let authRun = 0;
+  let settingUp = false;     // true while the "create username + password" step is saving
+  let verifiedSignup = false; // true after an email link was verified, before the account exists
+  try { verifiedSignup = sessionStorage.getItem(VERIFIED_KEY) === "1"; } catch (_) {}
+  function setVerified(v) {
+    verifiedSignup = v;
+    try { v ? sessionStorage.setItem(VERIFIED_KEY, "1") : sessionStorage.removeItem(VERIFIED_KEY); } catch (_) {}
+  }
 
-  function friendlyError(err) {
-    switch (err.code) {
-      case "auth/email-already-in-use": return "That username is already taken.";
+  // ---- Friendly error messages ----
+  function friendly(err) {
+    console.error(err);
+    switch (err && err.code) {
       case "auth/invalid-credential":
       case "auth/user-not-found":
       case "auth/wrong-password": return "Incorrect username or password.";
       case "auth/too-many-requests": return "Too many attempts. Please wait a moment and try again.";
       case "auth/unauthorized-domain": return "This website's address isn't authorized in Firebase yet.";
       case "auth/operation-not-allowed": return "This sign-in method isn't turned on in Firebase yet.";
+      case "auth/invalid-email": return "That email address doesn't look right.";
+      case "auth/popup-blocked": return "Your browser blocked the popup. Allow popups for this site and try again.";
+      case "auth/network-request-failed": return "Network error. Check your connection and try again.";
       case "auth/popup-closed-by-user":
       case "auth/cancelled-popup-request": return "";
       default: return "Something went wrong. Please try again.";
     }
   }
 
-  // --- Events ---
-  $("open-auth").addEventListener("click", () => openModal("login"));
-  $("close-auth").addEventListener("click", closeModal);
-  modal.addEventListener("click", e => { if (e.target === modal) closeModal(); });
-  document.addEventListener("keydown", e => { if (e.key === "Escape") closeModal(); });
-  $("tab-login").addEventListener("click", () => setMode("login"));
-  $("tab-signup").addEventListener("click", () => setMode("signup"));
-
-  $("google-btn").addEventListener("click", async () => {
-    if (!configured) return showMsg("Accounts aren't set up yet. Add your Firebase settings in index.html.");
-    try {
-      await signInWithPopup(auth, new GoogleAuthProvider());
-      closeModal();
-    } catch (err) { showMsg(friendlyError(err)); }
-  });
-
-  form.addEventListener("submit", async e => {
-    e.preventDefault();
-    if (!configured) return showMsg("Accounts aren't set up yet. Add your Firebase settings in index.html.");
-
-    const username = userIn.value.trim();
-    const password = passIn.value;
-
-    if (!/^[A-Za-z0-9_]{3,20}$/.test(username))
-      return showMsg("Username must be 3-20 characters: letters, numbers, or underscores.");
-    if (mode === "signup" && password.length < 8)
-      return showMsg("Password must be at least 8 characters.");
-    if (!password) return showMsg("Please enter your password.");
-
-    submitBtn.disabled = true;
-    try {
-      if (mode === "signup") {
-        const cred = await createUserWithEmailAndPassword(auth, toEmail(username), password);
-        await updateProfile(cred.user, { displayName: username });
-      } else {
-        await signInWithEmailAndPassword(auth, toEmail(username), password);
-      }
-      closeModal();
-    } catch (err) {
-      showMsg(friendlyError(err));
-    } finally {
-      submitBtn.disabled = false;
-    }
-  });
-
-  // --- Top bar updates when you log in or out ---
-  function renderAuthArea(user) {
-    authArea.replaceChildren();
-    if (user) {
-      const who = document.createElement("span");
-      who.className = "who";
-      who.append("Signed in as ");
-      const strong = document.createElement("strong");
-      strong.textContent = user.displayName || "friend";
-      who.appendChild(strong);
-
-      const out = document.createElement("button");
-      out.className = "pill-btn";
-      out.type = "button";
-      out.textContent = "Log out";
-      out.addEventListener("click", () => signOut(auth));
-
-      authArea.append(who, out);
+  // ---- Avatar + top bar ----
+  function makeAvatar(large) {
+    const span = document.createElement("span");
+    span.className = "avatar" + (large ? " large" : "");
+    if (profile && profile.photo) {
+      const img = document.createElement("img");
+      img.alt = "";
+      img.src = profile.photo;
+      span.appendChild(img);
     } else {
+      span.textContent = ((profile && profile.username) || "?").charAt(0).toUpperCase();
+    }
+    return span;
+  }
+
+  function renderAuthArea() {
+    authArea.classList.remove("pending");
+    authArea.replaceChildren();
+
+    if (currentUser && profile) {
+      const btn = document.createElement("button");
+      btn.className = "profile-btn";
+      btn.type = "button";
+      btn.title = "Settings";
+      btn.setAttribute("aria-label", "Open settings");
+      const name = document.createElement("span");
+      name.className = "name";
+      name.textContent = profile.username;
+      btn.append(makeAvatar(false), name);
+      btn.addEventListener("click", openSettings);
+      authArea.appendChild(btn);
+    } else if (!currentUser && !verifiedSignup) {
       const btn = document.createElement("button");
       btn.className = "pill-btn primary";
       btn.type = "button";
       btn.textContent = "Sign in";
-      btn.addEventListener("click", () => openModal("login"));
+      btn.addEventListener("click", () => openAuth("login"));
       authArea.appendChild(btn);
     }
   }
 
-  if (configured) onAuthStateChanged(auth, renderAuthArea);
+  // ---- Log in / Create account popup ----
+  let mode = "login";
+  function setMode(m) {
+    mode = m;
+    $("tab-login").classList.toggle("active", m === "login");
+    $("tab-signup").classList.toggle("active", m === "signup");
+    $("login-form").hidden = m !== "login";
+    $("signup-form").hidden = m !== "signup";
+    $("auth-heading").textContent = m === "login" ? "Welcome back" : "Join ReptiGuide";
+    $("auth-divider").textContent = m === "login" ? "or use your username" : "or use your email";
+    say(authMsg, "");
+  }
+  function openAuth(m) { setMode(m || "login"); open(authModal); }
+  function closeAuth() {
+    close(authModal);
+    $("login-form").reset();
+    $("signup-form").reset();
+    say(authMsg, "");
+  }
+
+  $("close-auth").addEventListener("click", closeAuth);
+  $("tab-login").addEventListener("click", () => setMode("login"));
+  $("tab-signup").addEventListener("click", () => setMode("signup"));
+
+  $("google-btn").addEventListener("click", async () => {
+    try { await signInWithPopup(auth, new GoogleAuthProvider()); }
+    catch (err) { say(authMsg, friendly(err)); }
+  });
+
+  // Log in with username + password
+  $("login-form").addEventListener("submit", async e => {
+    e.preventDefault();
+    const username = $("login-username").value.trim();
+    const password = $("login-password").value;
+    if (!username || !password) return say(authMsg, "Enter your username and password.");
+
+    $("login-submit").disabled = true;
+    say(authMsg, "");
+    try {
+      const snap = await getDoc(doc(db, "usernames", username.toLowerCase()));
+      if (!snap.exists() || !snap.data().alias) throw { code: "auth/invalid-credential" };
+      await signInWithEmailAndPassword(auth, snap.data().alias, password);
+    } catch (err) {
+      say(authMsg, friendly(err));
+    } finally {
+      $("login-submit").disabled = false;
+    }
+  });
+
+  // Create account step 1: send a verification link to the email
+  $("signup-form").addEventListener("submit", async e => {
+    e.preventDefault();
+    const email = $("signup-email").value.trim();
+    if (!/^\S+@\S+\.\S+$/.test(email)) return say(authMsg, "Enter a valid email address.");
+
+    $("signup-submit").disabled = true;
+    say(authMsg, "");
+    try {
+      await sendSignInLinkToEmail(verifyAuth, email, {
+        url: location.origin + location.pathname,
+        handleCodeInApp: true
+      });
+      try { localStorage.setItem(EMAIL_KEY, email); } catch (_) {}
+      say(authMsg, "Check your inbox for a link to verify your email. If you don't see it, check spam.", true);
+    } catch (err) {
+      say(authMsg, friendly(err));
+    } finally {
+      $("signup-submit").disabled = false;
+    }
+  });
+
+  // Back from the email link: confirm it, then forget the email
+  async function finishEmailLink() {
+    if (!isSignInWithEmailLink(verifyAuth, location.href)) return;
+    let email = null;
+    try { email = localStorage.getItem(EMAIL_KEY); } catch (_) {}
+    if (!email) email = window.prompt("Please confirm your email address to finish signing up:");
+    if (!email) return;
+    try {
+      const cred = await signInWithEmailLink(verifyAuth, email.trim(), location.href);
+      try { await deleteUser(cred.user); } catch (_) { await signOut(verifyAuth); }
+      try { localStorage.removeItem(EMAIL_KEY); } catch (_) {}
+      setVerified(true);
+      history.replaceState(null, "", location.pathname + location.hash);
+      if (!auth.currentUser) showSetup("");
+    } catch (err) {
+      console.error(err);
+      history.replaceState(null, "", location.pathname + location.hash);
+      openAuth("signup");
+      say(authMsg, "That link has expired or was already used. Please request a new one.");
+    }
+  }
+
+  // ---- Create username + password popup ----
+  function showSetup(message) {
+    closeAuth();
+    $("setup-form").reset();
+    $("setup-sub").textContent = "You're verified. Now choose a username and password.";
+    say(setupMsg, message);
+    renderAuthArea();
+    open(setupModal);
+  }
+
+  $("setup-form").addEventListener("submit", async e => {
+    e.preventDefault();
+
+    const username = $("setup-username").value.trim();
+    const pw = $("setup-password").value;
+    const pw2 = $("setup-password2").value;
+    if (!USERNAME_RE.test(username)) return say(setupMsg, "Username must be 3-20 characters: letters, numbers, or underscores.");
+    if (pw.length < 8) return say(setupMsg, "Password must be at least 8 characters.");
+    if (pw !== pw2) return say(setupMsg, "Passwords don't match.");
+
+    $("setup-submit").disabled = true;
+    settingUp = true;
+    say(setupMsg, "");
+    try {
+      const key = username.toLowerCase();
+      const existing = await getDoc(doc(db, "usernames", key));
+      if (existing.exists()) return say(setupMsg, "That username is already taken.");
+
+      let user = auth.currentUser;
+      let alias;
+      if (!user) {
+        // Email sign-up: the email was already verified, so the real account is made now.
+        if (!verifiedSignup) return say(setupMsg, "Please verify your email first.");
+        alias = newAlias();
+        user = (await createUserWithEmailAndPassword(auth, alias, pw)).user;
+      } else {
+        // Google sign-up (or a retry): add the username/password login.
+        const pwProvider = user.providerData.find(p => p.providerId === "password");
+        if (pwProvider) {
+          if (!pwProvider.email.endsWith("@" + ALIAS_DOMAIN)) {
+            return say(setupMsg, "This account was made with an older sign-up. Delete it in Firebase (Authentication > Users) and sign up again.");
+          }
+          alias = pwProvider.email;
+          await updatePassword(user, pw);
+        } else {
+          alias = newAlias();
+          await linkWithCredential(user, EmailAuthProvider.credential(alias, pw));
+        }
+      }
+
+      const batch = writeBatch(db);
+      batch.set(doc(db, "usernames", key), { uid: user.uid, alias });
+      batch.set(doc(db, "users", user.uid), { username });
+      await batch.commit();
+
+      currentUser = user;
+      profile = { username };
+      setVerified(false);
+      renderAuthArea();
+      close(setupModal);
+    } catch (err) {
+      console.error(err);
+      if (err.code === "permission-denied") say(setupMsg, "Couldn't save that username. It may have just been taken, so try another.");
+      else if (err.code === "auth/requires-recent-login") say(setupMsg, "For security, please cancel, sign in again, and finish setup.");
+      else if (err.code === "auth/weak-password") say(setupMsg, "That password is too weak. Try a longer one.");
+      else say(setupMsg, friendly(err));
+    } finally {
+      settingUp = false;
+      $("setup-submit").disabled = false;
+    }
+  });
+
+  $("setup-cancel").addEventListener("click", async () => {
+    setVerified(false);
+    if (auth.currentUser) await signOut(auth);
+    else { close(setupModal); renderAuthArea(); }
+  });
+
+  // ---- Settings popup ----
+  function renderSettings() {
+    $("settings-avatar").replaceChildren(makeAvatar(true));
+    $("settings-username").value = profile.username;
+    $("remove-photo").hidden = !profile.photo;
+  }
+  function openSettings() {
+    if (!profile) return;
+    renderSettings();
+    say(settingsMsg, "");
+    open(settingsModal);
+  }
+  $("close-settings").addEventListener("click", () => close(settingsModal));
+
+  // Change username (keeps usernames unique; the hidden login address stays the same)
+  $("username-form").addEventListener("submit", async e => {
+    e.preventDefault();
+    const user = auth.currentUser;
+    const newName = $("settings-username").value.trim();
+    if (!USERNAME_RE.test(newName)) return say(settingsMsg, "Username must be 3-20 characters: letters, numbers, or underscores.");
+    if (newName === profile.username) return say(settingsMsg, "That's already your username.");
+
+    const oldKey = profile.username.toLowerCase();
+    const newKey = newName.toLowerCase();
+    $("username-save").disabled = true;
+    say(settingsMsg, "");
+    try {
+      await runTransaction(db, async tx => {
+        if (newKey !== oldKey) {
+          const oldRef = doc(db, "usernames", oldKey);
+          const newRef = doc(db, "usernames", newKey);
+          const oldSnap = await tx.get(oldRef);
+          const newSnap = await tx.get(newRef);
+          if (newSnap.exists()) throw new Error("USERNAME_TAKEN");
+          if (!oldSnap.exists()) throw new Error("MISSING_OLD");
+          tx.set(newRef, { uid: user.uid, alias: oldSnap.data().alias });
+          tx.delete(oldRef);
+        }
+        tx.update(doc(db, "users", user.uid), { username: newName });
+      });
+      profile.username = newName;
+      renderAuthArea();
+      renderSettings();
+      say(settingsMsg, "Username updated.", true);
+    } catch (err) {
+      console.error(err);
+      say(settingsMsg, err.message === "USERNAME_TAKEN" ? "That username is already taken." : "Couldn't update your username. Please try again.");
+    } finally {
+      $("username-save").disabled = false;
+    }
+  });
+
+  // Change profile picture (resized to a small square, saved with your profile)
+  function resizeImage(file, size) {
+    return new Promise((resolve, reject) => {
+      const url = URL.createObjectURL(file);
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement("canvas");
+        canvas.width = canvas.height = size;
+        const ctx = canvas.getContext("2d");
+        ctx.fillStyle = "#ffffff";
+        ctx.fillRect(0, 0, size, size);
+        const side = Math.min(img.width, img.height);
+        ctx.drawImage(img, (img.width - side) / 2, (img.height - side) / 2, side, side, 0, 0, size, size);
+        URL.revokeObjectURL(url);
+        resolve(canvas.toDataURL("image/jpeg", 0.85));
+      };
+      img.onerror = () => { URL.revokeObjectURL(url); reject(new Error("bad image")); };
+      img.src = url;
+    });
+  }
+
+  async function savePhoto(value) {
+    await updateDoc(doc(db, "users", auth.currentUser.uid), { photo: value });
+    profile.photo = value;
+    renderAuthArea();
+    renderSettings();
+  }
+
+  $("change-photo").addEventListener("click", () => $("photo-input").click());
+  $("photo-input").addEventListener("change", async () => {
+    const input = $("photo-input");
+    const file = input.files[0];
+    input.value = "";
+    if (!file) return;
+    if (!file.type.startsWith("image/")) return say(settingsMsg, "Please choose an image file.");
+    if (file.size > 10 * 1024 * 1024) return say(settingsMsg, "That image is too large (10 MB max).");
+    say(settingsMsg, "");
+    try {
+      await savePhoto(await resizeImage(file, 256));
+      say(settingsMsg, "Profile picture updated.", true);
+    } catch (err) {
+      console.error(err);
+      say(settingsMsg, "Couldn't use that image. Try a different one.");
+    }
+  });
+
+  $("remove-photo").addEventListener("click", async () => {
+    say(settingsMsg, "");
+    try { await savePhoto(""); say(settingsMsg, "Profile picture removed.", true); }
+    catch (err) { console.error(err); say(settingsMsg, "Couldn't remove your picture. Please try again."); }
+  });
+
+  $("logout-btn").addEventListener("click", async () => {
+    await signOut(auth);
+    close(settingsModal);
+  });
+
+  // ---- Close popups with Escape or by clicking outside ----
+  document.addEventListener("keydown", e => {
+    if (e.key !== "Escape") return;
+    closeAuth();
+    close(settingsModal);
+  });
+  authModal.addEventListener("click", e => { if (e.target === authModal) closeAuth(); });
+  settingsModal.addEventListener("click", e => { if (e.target === settingsModal) close(settingsModal); });
+
+  // ---- React to logging in / out ----
+  onAuthStateChanged(auth, async user => {
+    if (settingUp) { currentUser = user; return; }
+
+    const run = ++authRun;
+    currentUser = user;
+    profile = null;
+    let loadFailed = false;
+
+    if (user) {
+      try {
+        const snap = await getDoc(doc(db, "users", user.uid));
+        profile = snap.exists() ? snap.data() : null;
+      } catch (err) {
+        console.error(err);
+        loadFailed = true;
+      }
+      if (run !== authRun) return;
+    }
+
+    renderAuthArea();
+
+    if (!user) {
+      close(settingsModal);
+      if (verifiedSignup) showSetup("");
+      else close(setupModal);
+    } else if (profile) {
+      close(setupModal);
+      closeAuth();
+    } else {
+      showSetup(loadFailed ? "Couldn't load your profile. Make sure Firestore is set up in Firebase." : "");
+    }
+  });
+
+  finishEmailLink();
 </script>
+
 </body>
 </html>
